@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人系统管理</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <style>
+        .drag-over { background: #e0f2fe !important; border: 2px dashed #3b82f6; }
+        .dragging { opacity: 0.5; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .status-online { background: #10b981; box-shadow: 0 0 6px #10b981; }
+        .status-offline { background: #ef4444; }
+        .card { cursor: grab; transition: transform 0.2s, box-shadow 0.2s; }
+        .card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px -5px rgba(0,0,0,0.1); }
+        .card:active { cursor: grabbing; }
+        .fade-in { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .btn-primary { background: #3b82f6; color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; transition: all 0.2s; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-danger { background: #ef4444; color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; transition: all 0.2s; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-secondary { background: #e5e7eb; color: #374151; padding: 0.5rem 1rem; border-radius: 0.5rem; transition: all 0.2s; }
+        .btn-secondary:hover { background: #d1d5db; }
+        input, textarea, select { border: 1px solid #d1d5db; border-radius: 0.5rem; padding: 0.5rem; width: 100%; outline: none; transition: border-color 0.2s; }
+        input:focus, textarea:focus, select:focus { border-color: #3b82f6; }
+        .modal-overlay { background: rgba(0,0,0,0.5); }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-sm sticky top-0 z-10">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center">
+                    <i data-lucide="layout-dashboard" class="w-6 h-6 text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-gray-800">个人系统管理</h1>
+                    <p class="text-sm text-gray-500">系统状态一览</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2 text-sm text-gray-500">
+                    <span class="status-dot status-online"></span> <span id="online-count">0</span> 在线
+                    <span class="mx-2">|</span>
+                    <span class="status-dot status-offline"></span> <span id="offline-count">0</span> 离线
+                </div>
+                <button onclick="openModal()" class="btn-primary flex items-center gap-2">
+                    <i data-lucide="plus" class="w-4 h-4"></i> 添加系统
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Systems Grid -->
+        <div id="systems-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <!-- Cards will be injected here -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="hidden text-center py-20">
+            <div class="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i data-lucide="inbox" class="w-10 h-10 text-gray-400"></i>
+            </div>
+            <h3 class="text-lg font-medium text-gray-600 mb-2">暂无系统</h3>
+            <p class="text-gray-400 mb-4">点击上方按钮添加你的第一个系统</p>
+        </div>
+    </main>
+
+    <!-- Modal -->
+    <div id="modal" class="fixed inset-0 modal-overlay z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md fade-in">
+            <div class="px-6 py-4 border-b flex items-center justify-between">
+                <h2 id="modal-title" class="text-lg font-semibold">添加系统</h2>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <form id="system-form" class="p-6 space-y-4">
+                <input type="hidden" id="system-id">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">名称 *</label>
+                    <input type="text" id="name" required placeholder="系统名称">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">地址 *</label>
+                    <input type="url" id="url" required placeholder="http://localhost:8080">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">端口</label>
+                    <input type="number" id="port" placeholder="8080">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">描述</label>
+                    <textarea id="description" rows="2" placeholder="简要描述"></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">图标</label>
+                        <select id="icon" class="bg-white">
+                            <option value="box">📦 盒子</option>
+                            <option value="printer">🖨️ 打印机</option>
+                            <option value="bar-chart-2">📊 图表</option>
+                            <option value="database">🗄️ 数据库</option>
+                            <option value="server">🖥️ 服务器</option>
+                            <option value="cloud">☁️ 云</option>
+                            <option value="code">💻 代码</option>
+                            <option value="settings">⚙️ 设置</option>
+                            <option value="shopping-cart">🛒 购物</option>
+                            <option value="folder">📁 文件夹</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">颜色</label>
+                        <input type="color" id="color" value="#3b82f6" class="h-10 cursor-pointer">
+                    </div>
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button type="submit" class="btn-primary flex-1">保存</button>
+                    <button type="button" onclick="closeModal()" class="btn-secondary flex-1">取消</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirm Modal -->
+    <div id="delete-modal" class="fixed inset-0 modal-overlay z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-sm fade-in">
+            <div class="p-6 text-center">
+                <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i data-lucide="alert-triangle" class="w-8 h-8 text-red-500"></i>
+                </div>
+                <h3 class="text-lg font-semibold mb-2">确认删除</h3>
+                <p class="text-gray-500 mb-6">确定要删除 "<span id="delete-name"></span>" 吗？</p>
+                <div class="flex gap-3">
+                    <button onclick="confirmDelete()" class="btn-danger flex-1">删除</button>
+                    <button onclick="closeDeleteModal()" class="btn-secondary flex-1">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let systems = [];
+        let draggedItem = null;
+
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            loadSystems();
+        });
+
+        // Load systems
+        async function loadSystems() {
+            const res = await fetch('/api/systems');
+            systems = await res.json();
+            renderSystems();
+            checkAllStatus(); // 立即检测状态
+            setInterval(checkAllStatus, 30000); // 每30秒检测一次
+        }
+
+        // Render
+        function renderSystems() {
+            const grid = document.getElementById('systems-grid');
+            const empty = document.getElementById('empty-state');
+
+            if (systems.length === 0) {
+                grid.innerHTML = '';
+                empty.classList.remove('hidden');
+                return;
+            }
+
+            empty.classList.add('hidden');
+            grid.innerHTML = systems.map(s => `
+                <div class="card bg-white rounded-xl shadow-sm p-5 border border-gray-100"
+                     draggable="true" data-id="${s.id}"
+                     ondragstart="handleDragStart(event)" ondragend="handleDragEnd(event)"
+                     ondragover="handleDragOver(event)" ondrop="handleDrop(event)">
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="w-12 h-12 rounded-xl flex items-center justify-center text-white text-xl"
+                             style="background: ${s.color}">
+                            <i data-lucide="${s.icon}" class="w-6 h-6"></i>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="status-dot ${s.online ? 'status-online' : 'status-offline'}" id="status-${s.id}"></span>
+                            <div class="flex gap-1">
+                                <button onclick="editSystem(${s.id})" class="p-1 text-gray-400 hover:text-blue-500" title="编辑">
+                                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                                </button>
+                                <button onclick="openDeleteModal(${s.id})" class="p-1 text-gray-400 hover:text-red-500" title="删除">
+                                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <a href="${s.url}" target="_blank" class="block group">
+                        <h3 class="font-semibold text-gray-800 group-hover:text-blue-500 transition-colors">${s.name}</h3>
+                        <p class="text-sm text-gray-500 mt-1">${s.description || '暂无描述'}</p>
+                        ${s.port ? `<p class="text-xs text-gray-400 mt-2">端口: ${s.port}</p>` : ''}
+                    </a>
+                </div>
+            `).join('');
+
+            lucide.createIcons();
+            updateStatusCounts();
+        }
+
+        // Status check
+        async function checkAllStatus() {
+            for (const s of systems) {
+                try {
+                    const res = await fetch(`/api/systems/${s.id}/status`);
+                    const data = await res.json();
+                    s.online = data.online;
+                    const dot = document.getElementById(`status-${s.id}`);
+                    if (dot) {
+                        dot.className = `status-dot ${data.online ? 'status-online' : 'status-offline'}`;
+                    }
+                } catch (e) {
+                    s.online = false;
+                }
+            }
+            updateStatusCounts();
+        }
+
+        function updateStatusCounts() {
+            const online = systems.filter(s => s.online).length;
+            const offline = systems.length - online;
+            document.getElementById('online-count').textContent = online;
+            document.getElementById('offline-count').textContent = offline;
+        }
+
+        // Modal
+        function openModal(system = null) {
+            document.getElementById('modal').classList.remove('hidden');
+            document.getElementById('modal').classList.add('flex');
+            document.getElementById('modal-title').textContent = system ? '编辑系统' : '添加系统';
+            document.getElementById('system-id').value = system?.id || '';
+            document.getElementById('name').value = system?.name || '';
+            document.getElementById('url').value = system?.url || '';
+            document.getElementById('port').value = system?.port || '';
+            document.getElementById('description').value = system?.description || '';
+            document.getElementById('icon').value = system?.icon || 'box';
+            document.getElementById('color').value = system?.color || '#3b82f6';
+            lucide.createIcons();
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.add('hidden');
+            document.getElementById('modal').classList.remove('flex');
+        }
+
+        function editSystem(id) {
+            const s = systems.find(x => x.id === id);
+            if (s) openModal(s);
+        }
+
+        // Form submit
+        document.getElementById('system-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('system-id').value;
+            const data = {
+                name: document.getElementById('name').value,
+                url: document.getElementById('url').value,
+                port: document.getElementById('port').value || null,
+                description: document.getElementById('description').value,
+                icon: document.getElementById('icon').value,
+                color: document.getElementById('color').value
+            };
+
+            if (id) {
+                await fetch(`/api/systems/${id}`, { method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+            } else {
+                await fetch('/api/systems', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+            }
+
+            closeModal();
+            loadSystems();
+        });
+
+        // Delete
+        let deleteId = null;
+        function openDeleteModal(id) {
+            deleteId = id;
+            const s = systems.find(x => x.id === id);
+            document.getElementById('delete-name').textContent = s?.name || '';
+            document.getElementById('delete-modal').classList.remove('hidden');
+            document.getElementById('delete-modal').classList.add('flex');
+        }
+
+        function closeDeleteModal() {
+            deleteId = null;
+            document.getElementById('delete-modal').classList.add('hidden');
+            document.getElementById('delete-modal').classList.remove('flex');
+        }
+
+        async function confirmDelete() {
+            if (deleteId) {
+                await fetch(`/api/systems/${deleteId}`, { method: 'DELETE' });
+                closeDeleteModal();
+                loadSystems();
+            }
+        }
+
+        // Drag & Drop
+        function handleDragStart(e) {
+            draggedItem = e.target;
+            e.target.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function handleDragEnd(e) {
+            e.target.classList.remove('dragging');
+            document.querySelectorAll('.card').forEach(c => c.classList.remove('drag-over'));
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const card = e.target.closest('.card');
+            if (card && card !== draggedItem) {
+                card.classList.add('drag-over');
+            }
+        }
+
+        async function handleDrop(e) {
+            e.preventDefault();
+            const target = e.target.closest('.card');
+            if (!target || target === draggedItem) return;
+
+            const fromId = parseInt(draggedItem.dataset.id);
+            const toId = parseInt(target.dataset.id);
+
+            // Reorder in DOM
+            const fromIndex = systems.findIndex(s => s.id === fromId);
+            const toIndex = systems.findIndex(s => s.id === toId);
+            const [moved] = systems.splice(fromIndex, 1);
+            systems.splice(toIndex, 0, moved);
+
+            // Update sort orders
+            const orders = systems.map((s, i) => ({ id: s.id, sort_order: i }));
+            await fetch('/api/systems/reorder', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ orders })
+            });
+
+            renderSystems();
+        }
+    </script>
+</body>
+</html>

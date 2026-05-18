@@ -1,8 +1,10 @@
 """Dashboard - 个人系统管理首页"""
-import os, sqlite3, subprocess
+import os, sqlite3, subprocess, threading, atexit, time
+from datetime import datetime, timedelta, timezone
 from flask import Flask, request, jsonify, g, send_from_directory
 from flask_cors import CORS
 import requests
+import psutil
 
 app = Flask(__name__, template_folder='templates')
 CORS(app)
@@ -20,14 +22,34 @@ def close_db(e):
     if db: db.close()
 
 def migrate_db():
-    """数据库迁移：添加新字段"""
+    """数据库迁移：添加新字段和新表"""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+    # systems 表迁移
     c.execute("PRAGMA table_info(systems)")
     columns = [col[1] for col in c.fetchall()]
     if 'service_name' not in columns:
         c.execute('ALTER TABLE systems ADD COLUMN service_name TEXT')
-        conn.commit()
+    # wsl_metrics 表
+    c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='wsl_metrics'")
+    if not c.fetchone():
+        c.execute('''CREATE TABLE wsl_metrics (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            cpu_percent REAL,
+            mem_used REAL, mem_total REAL, mem_percent REAL,
+            disk_used REAL, disk_total REAL, disk_percent REAL)''')
+        c.execute('CREATE INDEX idx_wsl_metrics_ts ON wsl_metrics(timestamp)')
+    # wsl_events 表（开机/关机事件）
+    c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='wsl_events'")
+    if not c.fetchone():
+        c.execute('''CREATE TABLE wsl_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_type TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            detail TEXT)''')
+        c.execute('CREATE INDEX idx_wsl_events_ts ON wsl_events(timestamp)')
+    conn.commit()
     conn.close()
 
 def init_db():
@@ -107,6 +129,160 @@ def check_status(sid):
         online = r.status_code < 500
     except: online = False
     return jsonify({'id': sid, 'online': online})
+
+# --- WSL 性能监控 ---
+METRICS_INTERVAL = 300  # 5 minutes
+METRICS_RETENTION_DAYS = 30
+_sampler_stop = threading.Event()
+
+def _record_boot_event():
+    """Detect and record boot event on startup."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    boot_time = datetime.fromtimestamp(psutil.boot_time(), tz=timezone.utc)
+    boot_str = boot_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+    # Check if we already recorded a boot at this time
+    c.execute('SELECT id FROM wsl_events WHERE event_type=? AND timestamp=?',
+              ('boot', boot_str))
+    if not c.fetchone():
+        c.execute('INSERT INTO wsl_events (event_type, timestamp, detail) VALUES (?,?,?)',
+                  ('boot', boot_str, 'uptime detection'))
+        # Check if previous event was a shutdown; if not, insert one for the gap
+        c.execute('SELECT timestamp FROM wsl_events WHERE event_type IN (?,?) ORDER BY timestamp DESC LIMIT 1',
+                  ('boot', 'shutdown'))
+        prev = c.fetchone()
+        if prev:
+            last_ts = datetime.fromisoformat(prev[0].replace('Z', '+00:00'))
+            if boot_time - last_ts > timedelta(hours=1):
+                # There was an unrecorded shutdown - estimate time from last metric
+                c.execute('SELECT timestamp FROM wsl_metrics ORDER BY timestamp DESC LIMIT 1')
+                last_metric = c.fetchone()
+                if last_metric:
+                    c.execute('INSERT INTO wsl_events (event_type, timestamp, detail) VALUES (?,?,?)',
+                              ('shutdown', last_metric[0], 'estimated from last metric'))
+        conn.commit()
+    conn.close()
+
+def _record_shutdown_event():
+    """Record shutdown event on exit (best-effort)."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        now = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+        c.execute('INSERT INTO wsl_events (event_type, timestamp, detail) VALUES (?,?,?)',
+                  ('shutdown', now, 'graceful shutdown'))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+def _sample_metrics():
+    """Collect and store current metrics."""
+    try:
+        cpu = psutil.cpu_percent(interval=1)
+        mem = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+        ts = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute(
+            'INSERT INTO wsl_metrics (timestamp, cpu_percent, mem_used, mem_total, mem_percent, disk_used, disk_total, disk_percent) VALUES (?,?,?,?,?,?,?,?)',
+            (ts, cpu, round(mem.used/(1024**3), 2), round(mem.total/(1024**3), 1),
+             round(mem.percent, 1), round(disk.used/(1024**3), 2), round(disk.total/(1024**3), 1),
+             round(disk.percent, 1)))
+        conn.commit()
+        conn.close()
+        # Cleanup old data
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=METRICS_RETENTION_DAYS)).strftime('%Y-%m-%dT%H:%M:%SZ')
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute('DELETE FROM wsl_metrics WHERE timestamp < ?', (cutoff,))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+def _sampler_loop():
+    """Background loop that samples metrics every METRICS_INTERVAL seconds."""
+    _sample_metrics()  # first sample immediately
+    while not _sampler_stop.wait(METRICS_INTERVAL):
+        _sample_metrics()
+
+def start_metrics_sampler():
+    """Start background metrics sampler and record boot event."""
+    _record_boot_event()
+    atexit.register(_record_shutdown_event)
+    t = threading.Thread(target=_sampler_loop, daemon=True)
+    t.start()
+
+@app.route('/api/wsl/metrics')
+def wsl_metrics():
+    cpu_percent = psutil.cpu_percent(interval=0.5)
+    mem = psutil.virtual_memory()
+    disk = psutil.disk_usage('/')
+    uptime_hours = (psutil.time.time() - psutil.boot_time()) / 3600
+    if uptime_hours >= 24:
+        uptime_str = f'{int(uptime_hours // 24)}d {int(uptime_hours % 24)}h'
+    else:
+        uptime_str = f'{uptime_hours:.1f}h'
+    return jsonify({
+        'cpu_percent': cpu_percent,
+        'memory': {
+            'total': round(mem.total / (1024**3), 1),
+            'used': round(mem.used / (1024**3), 1),
+            'percent': mem.percent
+        },
+        'disk': {
+            'total': round(disk.total / (1024**3), 1),
+            'used': round(disk.used / (1024**3), 1),
+            'percent': round(disk.percent, 1)
+        },
+        'uptime': uptime_str
+    })
+
+@app.route('/api/wsl/metrics/history')
+def wsl_metrics_history():
+    """Return historical metrics with downsampling and events."""
+    hours = request.args.get('hours', 24, type=int)
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).strftime('%Y-%m-%dT%H:%M:%SZ')
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        'SELECT timestamp, cpu_percent, mem_percent, disk_percent FROM wsl_metrics WHERE timestamp >= ? ORDER BY timestamp',
+        (cutoff,)).fetchall()
+    conn.close()
+
+    # Downsample: target max ~100 points for smooth sparkline
+    raw = [dict(r) for r in rows]
+    max_points = 100
+    if len(raw) > max_points:
+        step = len(raw) / max_points
+        metrics = [raw[int(i * step)] for i in range(max_points)]
+    else:
+        metrics = raw
+
+    # Get events in the same time range
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    events = conn.execute(
+        'SELECT event_type, timestamp FROM wsl_events WHERE timestamp >= ? ORDER BY timestamp',
+        (cutoff,)).fetchall()
+    conn.close()
+
+    return jsonify({
+        'metrics': metrics,
+        'events': [dict(e) for e in events]
+    })
+
+@app.route('/api/wsl/events')
+def wsl_events():
+    """Return boot/shutdown events, most recent first."""
+    limit = request.args.get('limit', 20, type=int)
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        'SELECT event_type, timestamp, detail FROM wsl_events ORDER BY timestamp DESC LIMIT ?',
+        (limit,)).fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
 
 # --- 服务控制 ---
 ACTION_LABEL = {'start': '启动', 'stop': '停止', 'restart': '重启'}
@@ -198,4 +374,5 @@ def manage():
 
 if __name__ == '__main__':
     init_db()
+    start_metrics_sampler()
     app.run(host='0.0.0.0', port=8850, debug=True)

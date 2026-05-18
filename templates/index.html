@@ -28,11 +28,13 @@
         .card .drag-handle:active { cursor: grabbing; }
         .fade-in { animation: fadeIn 0.25s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-        .placeholder-section {
-            border: 2px dashed #e2e8f0; border-radius: 1rem;
-            transition: border-color 0.2s;
+        .sparkline { width: 100%; height: 28px; }
+        .range-btn {
+            padding: 1px 7px; font-size: 11px; border-radius: 5px; cursor: pointer;
+            color: #94a3b8; background: transparent; border: none; transition: all 0.15s; line-height: 1.4;
         }
-        .placeholder-section:hover { border-color: #cbd5e1; }
+        .range-btn:hover { color: #64748b; }
+        .range-btn.active { color: #334155; background: #f1f5f9; }
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen">
@@ -70,15 +72,74 @@
             <p class="text-slate-400 text-sm">暂无系统，前往管理页面添加</p>
         </div>
 
-        <!-- WSL Monitor Placeholder -->
+        <!-- WSL Monitor -->
         <div class="mt-16">
             <div class="flex items-center gap-2 mb-4">
                 <i data-lucide="activity" class="w-4 h-4 text-slate-300"></i>
                 <h2 class="text-sm font-medium text-slate-400">系统状态</h2>
+                <div class="ml-auto flex gap-0.5 bg-slate-100 rounded-md p-0.5">
+                    <button onclick="switchRange(24)" class="range-btn active" data-range="24">24h</button>
+                    <button onclick="switchRange(168)" class="range-btn" data-range="168">7d</button>
+                    <button onclick="switchRange(720)" class="range-btn" data-range="720">30d</button>
+                </div>
+                <span id="uptime" class="text-xs text-slate-300"></span>
             </div>
-            <div class="placeholder-section px-6 py-8 flex items-center justify-center gap-3 text-slate-300">
-                <i data-lucide="monitor" class="w-5 h-5"></i>
-                <span class="text-sm">WSL 系统监控 · 即将推出</span>
+            <div class="grid grid-cols-3 gap-4">
+                <!-- CPU -->
+                <div class="bg-white rounded-xl border border-slate-200/80 p-4">
+                    <div class="flex items-center gap-2 mb-3">
+                        <div class="w-7 h-7 rounded-md bg-blue-50 flex items-center justify-center">
+                            <i data-lucide="cpu" class="w-3.5 h-3.5 text-blue-400"></i>
+                        </div>
+                        <span class="text-xs text-slate-400">CPU</span>
+                    </div>
+                    <div class="text-2xl font-bold text-slate-800" id="cpu-val">--</div>
+                    <div class="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div id="cpu-bar" class="h-full bg-blue-400 rounded-full transition-all duration-500" style="width:0%"></div>
+                    </div>
+                    <svg class="sparkline mt-2" id="cpu-spark"></svg>
+                </div>
+                <!-- Memory -->
+                <div class="bg-white rounded-xl border border-slate-200/80 p-4">
+                    <div class="flex items-center gap-2 mb-3">
+                        <div class="w-7 h-7 rounded-md bg-emerald-50 flex items-center justify-center">
+                            <i data-lucide="memory-stick" class="w-3.5 h-3.5 text-emerald-400"></i>
+                        </div>
+                        <span class="text-xs text-slate-400">Memory</span>
+                    </div>
+                    <div class="text-2xl font-bold text-slate-800" id="mem-val">--</div>
+                    <div class="text-xs text-slate-400 mt-0.5" id="mem-detail"></div>
+                    <div class="mt-1.5 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div id="mem-bar" class="h-full bg-emerald-400 rounded-full transition-all duration-500" style="width:0%"></div>
+                    </div>
+                    <svg class="sparkline mt-2" id="mem-spark"></svg>
+                </div>
+                <!-- Disk -->
+                <div class="bg-white rounded-xl border border-slate-200/80 p-4">
+                    <div class="flex items-center gap-2 mb-3">
+                        <div class="w-7 h-7 rounded-md bg-amber-50 flex items-center justify-center">
+                            <i data-lucide="hard-drive" class="w-3.5 h-3.5 text-amber-400"></i>
+                        </div>
+                        <span class="text-xs text-slate-400">Disk</span>
+                    </div>
+                    <div class="text-2xl font-bold text-slate-800" id="disk-val">--</div>
+                    <div class="text-xs text-slate-400 mt-0.5" id="disk-detail"></div>
+                    <div class="mt-1.5 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div id="disk-bar" class="h-full bg-amber-400 rounded-full transition-all duration-500" style="width:0%"></div>
+                    </div>
+                    <svg class="sparkline mt-2" id="disk-spark"></svg>
+                </div>
+            </div>
+
+            <!-- Boot/Shutdown Events -->
+            <div class="mt-4 bg-white rounded-xl border border-slate-200/80 p-4">
+                <div class="flex items-center gap-2 mb-3">
+                    <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-300"></i>
+                    <span class="text-xs text-slate-400">开关机记录</span>
+                </div>
+                <div id="events-list" class="space-y-1.5 max-h-32 overflow-y-auto text-xs text-slate-500">
+                    <span class="text-slate-300">加载中...</span>
+                </div>
             </div>
         </div>
     </main>
@@ -91,6 +152,11 @@
         document.addEventListener('DOMContentLoaded', () => {
             lucide.createIcons();
             loadSystems();
+            loadMetrics();
+            loadHistory();
+            loadEvents();
+            setInterval(loadMetrics, 30000);
+            setInterval(loadHistory, 300000); // refresh sparkline every 5min
         });
 
         async function loadSystems() {
@@ -158,6 +224,131 @@
             const s = systems.find(x => x.id === id);
             if (s && s.url) window.open(s.url, '_blank');
         });
+
+        // Metrics
+        async function loadMetrics() {
+            try {
+                const res = await fetch('/api/wsl/metrics');
+                const d = await res.json();
+                document.getElementById('cpu-val').textContent = d.cpu_percent + '%';
+                document.getElementById('cpu-bar').style.width = d.cpu_percent + '%';
+                document.getElementById('cpu-bar').className = `h-full rounded-full transition-all duration-500 ${d.cpu_percent > 80 ? 'bg-red-400' : 'bg-blue-400'}`;
+
+                document.getElementById('mem-val').textContent = d.memory.percent + '%';
+                document.getElementById('mem-detail').textContent = `${d.memory.used} / ${d.memory.total} GB`;
+                document.getElementById('mem-bar').style.width = d.memory.percent + '%';
+                document.getElementById('mem-bar').className = `h-full rounded-full transition-all duration-500 ${d.memory.percent > 80 ? 'bg-red-400' : 'bg-emerald-400'}`;
+
+                document.getElementById('disk-val').textContent = d.disk.percent + '%';
+                document.getElementById('disk-detail').textContent = `${d.disk.used} / ${d.disk.total} GB`;
+                document.getElementById('disk-bar').style.width = d.disk.percent + '%';
+                document.getElementById('disk-bar').className = `h-full rounded-full transition-all duration-500 ${d.disk.percent > 80 ? 'bg-red-400' : 'bg-amber-400'}`;
+
+                document.getElementById('uptime').textContent = 'up ' + d.uptime;
+            } catch {}
+        }
+
+        let currentRange = 24;
+        let currentEvents = [];
+
+        // Sparkline
+        function renderSparkline(svgId, data, events, color, warnColor) {
+            const svg = document.getElementById(svgId);
+            if (!svg || data.length < 2) {
+                if (svg) svg.innerHTML = '';
+                return;
+            }
+            const W = 200, H = 28, PAD = 2;
+            const vals = data.map(d => d.value);
+            const tsList = data.map(d => d.timestamp);
+            const maxV = Math.max(...vals, 1);
+            const points = vals.map((v, i) => {
+                const x = PAD + (i / (vals.length - 1)) * (W - 2 * PAD);
+                const y = H - PAD - (v / maxV) * (H - 2 * PAD);
+                return { x, y };
+            });
+
+            const lastVal = vals[vals.length - 1];
+            const strokeColor = lastVal > 80 ? warnColor : color;
+            const fillColor = lastVal > 80 ? warnColor : color;
+            const ptsStr = points.map(p => `${p.x},${p.y}`).join(' ');
+            const areaPath = `M${ptsStr} L${points[points.length-1].x},${H} L${points[0].x},${H} Z`;
+
+            let html = `
+                <defs>
+                    <linearGradient id="grad-${svgId}" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="${fillColor}" stop-opacity="0.15"/>
+                        <stop offset="100%" stop-color="${fillColor}" stop-opacity="0"/>
+                    </linearGradient>
+                </defs>
+                <path d="${areaPath}" fill="url(#grad-${svgId})"/>
+                <polyline points="${ptsStr}" fill="none" stroke="${strokeColor}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="${points[points.length-1].x}" cy="${points[points.length-1].y}" r="2" fill="${strokeColor}"/>`;
+
+            // Event markers
+            if (events && events.length > 0) {
+                const firstTs = new Date(tsList[0]).getTime();
+                const lastTs = new Date(tsList[tsList.length - 1]).getTime();
+                const range = lastTs - firstTs || 1;
+                events.forEach(e => {
+                    const eTs = new Date(e.timestamp).getTime();
+                    if (eTs < firstTs || eTs > lastTs) return;
+                    const x = PAD + ((eTs - firstTs) / range) * (W - 2 * PAD);
+                    const isBoot = e.event_type === 'boot';
+                    const lineColor = isBoot ? '#34d399' : '#cbd5e1';
+                    html += `<line x1="${x}" y1="${PAD}" x2="${x}" y2="${H-PAD}" stroke="${lineColor}" stroke-width="1" stroke-dasharray="2,2" opacity="0.7"/>`;
+                    // Small triangle marker at top
+                    if (isBoot) {
+                        html += `<polygon points="${x-2.5},${PAD} ${x+2.5},${PAD} ${x},${PAD+3}" fill="#34d399" opacity="0.8"/>`;
+                    } else {
+                        html += `<polygon points="${x-2.5},${PAD+3} ${x+2.5},${PAD+3} ${x},${PAD}" fill="#cbd5e1" opacity="0.8"/>`;
+                    }
+                });
+            }
+            svg.innerHTML = html;
+        }
+
+        function switchRange(hours) {
+            currentRange = hours;
+            document.querySelectorAll('.range-btn').forEach(b => {
+                b.classList.toggle('active', parseInt(b.dataset.range) === hours);
+            });
+            loadHistory();
+        }
+
+        async function loadHistory() {
+            try {
+                const res = await fetch(`/api/wsl/metrics/history?hours=${currentRange}`);
+                const resp = await res.json();
+                const data = resp.metrics || [];
+                currentEvents = resp.events || [];
+                if (data.length === 0) return;
+                renderSparkline('cpu-spark', data.map(d => ({ value: d.cpu_percent, timestamp: d.timestamp })), currentEvents, '#60a5fa', '#f87171');
+                renderSparkline('mem-spark', data.map(d => ({ value: d.mem_percent, timestamp: d.timestamp })), currentEvents, '#34d399', '#f87171');
+                renderSparkline('disk-spark', data.map(d => ({ value: d.disk_percent, timestamp: d.timestamp })), currentEvents, '#fbbf24', '#f87171');
+            } catch {}
+        }
+
+        // Boot/Shutdown Events
+        async function loadEvents() {
+            try {
+                const res = await fetch('/api/wsl/events?limit=10');
+                const events = await res.json();
+                const el = document.getElementById('events-list');
+                if (events.length === 0) {
+                    el.innerHTML = '<span class="text-slate-300">暂无记录</span>';
+                    return;
+                }
+                el.innerHTML = events.map(e => {
+                    const isBoot = e.event_type === 'boot';
+                    const icon = isBoot ? '▲' : '▼';
+                    const color = isBoot ? 'text-emerald-400' : 'text-slate-400';
+                    const label = isBoot ? '开机' : '关机';
+                    const time = new Date(e.timestamp).toLocaleString('zh-CN', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
+                    return `<div class="flex items-center gap-2"><span class="${color}">${icon}</span><span class="text-slate-500">${label}</span><span class="text-slate-300 ml-auto">${time}</span></div>`;
+                }).join('');
+            } catch {}
+        }
 
         // Status
         async function checkAllStatus() {

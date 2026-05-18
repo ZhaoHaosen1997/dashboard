@@ -1,16 +1,16 @@
 @echo off
-chcp 65001 >nul
-cd /d %~dp0
+chcp 65001 >nul 2>&1
+title Dashboard
 
-echo 启动 Dashboard 服务...
+echo Starting Dashboard...
+cd /d "%~dp0"
 
-REM 检查是否有虚拟环境
-if exist .venv\Scripts\activate.bat (
-    call .venv\Scripts\activate.bat
-    echo [虚拟环境] 已激活
-) else (
-    echo [提示] 未检测到虚拟环境，使用系统Python
+:: kill existing
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr :8850 ^| findstr LISTENING') do (
+    taskkill /F /PID %%a >nul 2>&1
 )
 
-REM 启动服务
-python app.py
+start /b python app.py
+echo Dashboard running on http://localhost:8850
+timeout /t 2 >nul
+start http://localhost:8850

@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统管理 - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <style>
+        * { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .status-online { background: #10b981; box-shadow: 0 0 6px rgba(16,185,129,0.5); }
+        .status-offline { background: #fca5a5; }
+        .status-checking { background: #fbbf24; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .fade-in { animation: fadeIn 0.2s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        .btn {
+            display: inline-flex; align-items: center; gap: 0.375rem;
+            padding: 0.375rem 0.75rem; border-radius: 0.5rem;
+            font-size: 0.8125rem; font-weight: 500; transition: all 0.15s;
+            cursor: pointer; border: none; outline: none;
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:hover:not(:disabled) { background: #2563eb; }
+        .btn-danger { background: #fee2e2; color: #dc2626; }
+        .btn-danger:hover:not(:disabled) { background: #fecaca; }
+        .btn-success { background: #dcfce7; color: #16a34a; }
+        .btn-success:hover:not(:disabled) { background: #bbf7d0; }
+        .btn-warning { background: #fef3c7; color: #d97706; }
+        .btn-warning:hover:not(:disabled) { background: #fde68a; }
+        .btn-ghost { background: #f1f5f9; color: #475569; }
+        .btn-ghost:hover:not(:disabled) { background: #e2e8f0; }
+        .modal-overlay { background: rgba(15,23,42,0.5); backdrop-filter: blur(2px); }
+        .log-viewer {
+            background: #1e293b; color: #e2e8f0; font-family: 'Cascadia Code', 'Fira Code', monospace;
+            font-size: 0.75rem; line-height: 1.6; white-space: pre-wrap; word-break: break-all;
+            max-height: 60vh; overflow-y: auto;
+        }
+        .log-viewer::-webkit-scrollbar { width: 6px; }
+        .log-viewer::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        .toast {
+            position: fixed; bottom: 24px; right: 24px; z-index: 100;
+            padding: 0.75rem 1rem; border-radius: 0.75rem; font-size: 0.875rem;
+            box-shadow: 0 10px 30px -5px rgba(0,0,0,0.15);
+            animation: slideIn 0.25s ease-out;
+        }
+        @keyframes slideIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        .toast-success { background: #dcfce7; color: #166534; }
+        .toast-error { background: #fee2e2; color: #991b1b; }
+        input, textarea, select {
+            border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 0.5rem 0.75rem;
+            width: 100%; outline: none; transition: border-color 0.15s; font-size: 0.875rem;
+        }
+        input:focus, textarea:focus, select:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white/80 backdrop-blur-sm border-b border-slate-200/60 sticky top-0 z-10">
+        <div class="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <a href="/" class="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-600 transition-colors">
+                    <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                    返回
+                </a>
+                <span class="text-slate-200">|</span>
+                <span class="text-sm font-medium text-slate-700">系统管理</span>
+            </div>
+            <button onclick="openModal()" class="btn btn-primary">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                添加系统
+            </button>
+        </div>
+    </header>
+
+    <!-- Main -->
+    <main class="max-w-5xl mx-auto px-6 py-8">
+        <div id="systems-list" class="space-y-3">
+        </div>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="hidden text-center py-20">
+            <div class="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <i data-lucide="inbox" class="w-8 h-8 text-slate-300"></i>
+            </div>
+            <p class="text-slate-400 text-sm mb-4">暂无系统</p>
+            <button onclick="openModal()" class="btn btn-primary">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                添加第一个系统
+            </button>
+        </div>
+    </main>
+
+    <!-- Edit Modal -->
+    <div id="edit-modal" class="fixed inset-0 modal-overlay z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md fade-in">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h2 id="modal-title" class="text-base font-semibold text-slate-800">添加系统</h2>
+                <button onclick="closeModal()" class="text-slate-300 hover:text-slate-500 transition-colors">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <form id="system-form" class="p-6 space-y-4">
+                <input type="hidden" id="system-id">
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 mb-1">名称 *</label>
+                    <input type="text" id="name" required placeholder="系统名称">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 mb-1">地址 *</label>
+                    <input type="url" id="url" required placeholder="http://localhost:8080">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 mb-1">端口</label>
+                        <input type="number" id="port" placeholder="8080">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 mb-1">服务名称</label>
+                        <input type="text" id="service_name" placeholder="my-service">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 mb-1">描述</label>
+                    <textarea id="description" rows="2" placeholder="简要描述"></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 mb-1">图标</label>
+                        <select id="icon" class="bg-white">
+                            <option value="box">📦 盒子</option>
+                            <option value="printer">🖨️ 打印机</option>
+                            <option value="bar-chart-2">📊 图表</option>
+                            <option value="database">🗄️ 数据库</option>
+                            <option value="server">🖥️ 服务器</option>
+                            <option value="cloud">☁️ 云</option>
+                            <option value="code">💻 代码</option>
+                            <option value="settings">⚙️ 设置</option>
+                            <option value="shopping-cart">🛒 购物</option>
+                            <option value="folder">📁 文件夹</option>
+                            <option value="globe">🌐 网站</option>
+                            <option value="bot">🤖 机器人</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-500 mb-1">颜色</label>
+                        <input type="color" id="color" value="#3b82f6" class="h-9 cursor-pointer">
+                    </div>
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button type="submit" class="btn btn-primary flex-1 justify-center">保存</button>
+                    <button type="button" onclick="closeModal()" class="btn btn-ghost flex-1 justify-center">取消</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirm Modal -->
+    <div id="delete-modal" class="fixed inset-0 modal-overlay z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm fade-in">
+            <div class="p-6 text-center">
+                <div class="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <i data-lucide="alert-triangle" class="w-7 h-7 text-red-400"></i>
+                </div>
+                <h3 class="text-base font-semibold text-slate-800 mb-1">确认删除</h3>
+                <p class="text-sm text-slate-400 mb-6">删除 "<span id="delete-name" class="text-slate-600"></span>" 后无法恢复</p>
+                <div class="flex gap-2">
+                    <button onclick="confirmDelete()" class="btn btn-danger flex-1 justify-center">删除</button>
+                    <button onclick="closeDeleteModal()" class="btn btn-ghost flex-1 justify-center">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Log Viewer Modal -->
+    <div id="log-modal" class="fixed inset-0 modal-overlay z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl fade-in">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="terminal" class="w-4 h-4 text-slate-400"></i>
+                    <h2 class="text-base font-semibold text-slate-800">
+                        日志 · <span id="log-service-name" class="text-slate-400 font-normal"></span>
+                    </h2>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="refreshLogs()" class="btn btn-ghost">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                        刷新
+                    </button>
+                    <button onclick="closeLogModal()" class="text-slate-300 hover:text-slate-500 transition-colors">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="log-content" class="log-viewer rounded-b-xl p-4">
+                加载中...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let systems = [];
+        let deleteId = null;
+        let logSystemId = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            loadSystems();
+        });
+
+        async function loadSystems() {
+            const res = await fetch('/api/systems');
+            systems = await res.json();
+            renderList();
+            checkAllStatus();
+            setInterval(checkAllStatus, 30000);
+        }
+
+        function renderList() {
+            const list = document.getElementById('systems-list');
+            const empty = document.getElementById('empty-state');
+
+            if (systems.length === 0) {
+                list.innerHTML = '';
+                empty.classList.remove('hidden');
+                lucide.createIcons();
+                return;
+            }
+
+            empty.classList.add('hidden');
+            list.innerHTML = systems.map(s => `
+                <div class="bg-white rounded-xl border border-slate-200/80 p-4 fade-in" id="system-${s.id}">
+                    <div class="flex items-start gap-4">
+                        <!-- Icon -->
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center text-white flex-shrink-0"
+                             style="background: ${s.color}">
+                            <i data-lucide="${s.icon}" class="w-5 h-5"></i>
+                        </div>
+
+                        <!-- Info -->
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2">
+                                <h3 class="font-semibold text-slate-800 text-sm">${s.name}</h3>
+                                <span class="status-dot ${s.online ? 'status-online' : 'status-offline'}"
+                                      id="status-${s.id}"></span>
+                            </div>
+                            <p class="text-xs text-slate-400 mt-0.5 truncate">${s.url}</p>
+                            ${s.description ? `<p class="text-xs text-slate-400 mt-0.5">${s.description}</p>` : ''}
+                            ${s.service_name ? `
+                                <div class="flex items-center gap-3 mt-2 text-xs text-slate-400">
+                                    <span class="flex items-center gap-1">
+                                        <i data-lucide="cpu" class="w-3 h-3"></i> ${s.service_name}
+                                    </span>
+                                    ${s.port ? `<span>端口 ${s.port}</span>` : ''}
+                                </div>
+                            ` : (s.port ? `
+                                <div class="mt-2 text-xs text-slate-400">端口 ${s.port}</div>
+                            ` : '')}
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="flex items-center gap-1 flex-shrink-0">
+                            ${s.service_name ? `
+                                <button onclick="serviceAction(${s.id}, 'start')" class="btn btn-success" title="启动">
+                                    <i data-lucide="play" class="w-3.5 h-3.5"></i>
+                                </button>
+                                <button onclick="serviceAction(${s.id}, 'stop')" class="btn btn-warning" title="停止">
+                                    <i data-lucide="square" class="w-3.5 h-3.5"></i>
+                                </button>
+                                <button onclick="serviceAction(${s.id}, 'restart')" class="btn btn-primary" title="重启">
+                                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                                </button>
+                                <button onclick="openLogModal(${s.id})" class="btn btn-ghost" title="日志">
+                                    <i data-lucide="terminal" class="w-3.5 h-3.5"></i>
+                                </button>
+                                <span class="w-px h-5 bg-slate-100 mx-1"></span>
+                            ` : ''}
+                            <button onclick="editSystem(${s.id})" class="btn btn-ghost" title="编辑">
+                                <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                            </button>
+                            <button onclick="openDeleteModal(${s.id})" class="btn btn-danger" title="删除">
+                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            lucide.createIcons();
+        }
+
+        // Status
+        async function checkAllStatus() {
+            const promises = systems.map(async s => {
+                const dot = document.getElementById(`status-${s.id}`);
+                if (dot) dot.className = 'status-dot status-checking';
+                try {
+                    const res = await fetch(`/api/systems/${s.id}/status`);
+                    const data = await res.json();
+                    s.online = data.online;
+                    if (dot) dot.className = `status-dot ${data.online ? 'status-online' : 'status-offline'}`;
+                } catch {
+                    s.online = false;
+                    if (dot) dot.className = 'status-dot status-offline';
+                }
+            });
+            await Promise.all(promises);
+        }
+
+        // Modal CRUD
+        function openModal(system = null) {
+            document.getElementById('edit-modal').classList.remove('hidden');
+            document.getElementById('edit-modal').classList.add('flex');
+            document.getElementById('modal-title').textContent = system ? '编辑系统' : '添加系统';
+            document.getElementById('system-id').value = system?.id || '';
+            document.getElementById('name').value = system?.name || '';
+            document.getElementById('url').value = system?.url || '';
+            document.getElementById('port').value = system?.port || '';
+            document.getElementById('service_name').value = system?.service_name || '';
+            document.getElementById('description').value = system?.description || '';
+            document.getElementById('icon').value = system?.icon || 'box';
+            document.getElementById('color').value = system?.color || '#3b82f6';
+            lucide.createIcons();
+            document.getElementById('name').focus();
+        }
+
+        function closeModal() {
+            document.getElementById('edit-modal').classList.add('hidden');
+            document.getElementById('edit-modal').classList.remove('flex');
+        }
+
+        function editSystem(id) {
+            const s = systems.find(x => x.id === id);
+            if (s) openModal(s);
+        }
+
+        document.getElementById('system-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('system-id').value;
+            const data = {
+                name: document.getElementById('name').value,
+                url: document.getElementById('url').value,
+                port: document.getElementById('port').value || null,
+                service_name: document.getElementById('service_name').value || null,
+                description: document.getElementById('description').value,
+                icon: document.getElementById('icon').value,
+                color: document.getElementById('color').value
+            };
+
+            const url = id ? `/api/systems/${id}` : '/api/systems';
+            const method = id ? 'PUT' : 'POST';
+            const res = await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+
+            if (res.ok) {
+                closeModal();
+                loadSystems();
+                showToast(id ? '系统已更新' : '系统已添加', 'success');
+            } else {
+                const err = await res.json();
+                showToast(err.error || '操作失败', 'error');
+            }
+        });
+
+        // Delete
+        function openDeleteModal(id) {
+            deleteId = id;
+            const s = systems.find(x => x.id === id);
+            document.getElementById('delete-name').textContent = s?.name || '';
+            document.getElementById('delete-modal').classList.remove('hidden');
+            document.getElementById('delete-modal').classList.add('flex');
+        }
+
+        function closeDeleteModal() {
+            deleteId = null;
+            document.getElementById('delete-modal').classList.add('hidden');
+            document.getElementById('delete-modal').classList.remove('flex');
+        }
+
+        async function confirmDelete() {
+            if (!deleteId) return;
+            const res = await fetch(`/api/systems/${deleteId}`, { method: 'DELETE' });
+            if (res.ok) {
+                closeDeleteModal();
+                loadSystems();
+                showToast('系统已删除', 'success');
+            }
+        }
+
+        // Service Control
+        const actionLabel = { start: '启动', stop: '停止', restart: '重启' };
+
+        async function serviceAction(id, action) {
+            const s = systems.find(x => x.id === id);
+            if (!s) return;
+
+            // 确认
+            const confirmed = confirm(`确认${actionLabel[action]} "${s.name}" 服务？`);
+            if (!confirmed) return;
+
+            try {
+                const res = await fetch(`/api/systems/${id}/service/${action}`, { method: 'POST' });
+                const data = await res.json();
+                if (data.ok) {
+                    showToast(data.message, 'success');
+                    // 等待后刷新状态
+                    setTimeout(() => checkAllStatus(), 1000);
+                    setTimeout(() => checkAllStatus(), 3000);
+                } else {
+                    showToast(data.message || '操作失败', 'error');
+                }
+            } catch (e) {
+                showToast('请求失败', 'error');
+            }
+        }
+
+        // Logs
+        function openLogModal(id) {
+            logSystemId = id;
+            const s = systems.find(x => x.id === id);
+            document.getElementById('log-service-name').textContent = s?.service_name || '';
+            document.getElementById('log-modal').classList.remove('hidden');
+            document.getElementById('log-modal').classList.add('flex');
+            refreshLogs();
+        }
+
+        function closeLogModal() {
+            logSystemId = null;
+            document.getElementById('log-modal').classList.add('hidden');
+            document.getElementById('log-modal').classList.remove('flex');
+        }
+
+        async function refreshLogs() {
+            if (!logSystemId) return;
+            const el = document.getElementById('log-content');
+            el.textContent = '加载中...';
+            try {
+                const res = await fetch(`/api/systems/${logSystemId}/logs?lines=100`);
+                const data = await res.json();
+                if (data.logs) {
+                    el.textContent = data.logs || '(无日志)';
+                } else {
+                    el.textContent = data.error || '加载失败';
+                }
+            } catch {
+                el.textContent = '请求失败';
+            }
+            lucide.createIcons();
+        }
+
+        // Toast
+        function showToast(msg, type = 'success') {
+            const el = document.createElement('div');
+            el.className = `toast toast-${type}`;
+            el.textContent = msg;
+            document.body.appendChild(el);
+            setTimeout(() => {
+                el.style.opacity = '0';
+                el.style.transition = 'opacity 0.3s';
+                setTimeout(() => el.remove(), 300);
+            }, 2500);
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+                closeDeleteModal();
+                closeLogModal();
+            }
+        });
+    </script>
+</body>
+</html>

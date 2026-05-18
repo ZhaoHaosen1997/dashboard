@@ -1,0 +1,4 @@
+config.db
+__pycache__/
+*.pyc
+.workbuddy/

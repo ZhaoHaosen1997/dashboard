@@ -568,8 +568,10 @@ def _get_webdav_client():
         raise ValueError('WebDAV 未配置')
     return WebDavClient({
         'webdav_hostname': row['webdav_url'],
+        'webdav_root': '/',
         'webdav_login': row['username'],
-        'webdav_password': decrypt_password(row['password_encrypted'])
+        'webdav_password': decrypt_password(row['password_encrypted']),
+        'disable_check': True
     })
 
 @app.route('/api/webdav/config', methods=['GET'])
@@ -607,12 +609,34 @@ def check_webdav():
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)})
 
+def _webdav_remote_dir(system_id=None):
+    """获取云端的远程目录路径，按系统名分目录"""
+    if system_id is None:
+        return '/dashboard/dashboard/'
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    row = conn.execute('SELECT service_name FROM systems WHERE id=?', (system_id,)).fetchone()
+    conn.close()
+    name = row['service_name'] if row else str(system_id)
+    return f'/dashboard/{name}/'
+
 @app.route('/api/webdav/list')
 def list_webdav_files():
+    """列出云端指定系统目录的文件"""
+    system_id = request.args.get('system_id', type=int)  # None=dashboard
+    remote_dir = _webdav_remote_dir(system_id)
     try:
         client = _get_webdav_client()
-        files = client.list()
-        return jsonify({'ok': True, 'files': [f for f in files if not f.endswith('/')]})
+        try:
+            files = client.list(remote_dir)
+        except Exception:
+            files = []
+        result = []
+        for f in files:
+            name = f.split('/')[-1] if '/' in f else f
+            if name and not f.endswith('/'):
+                result.append({'name': name, 'path': remote_dir + name})
+        return jsonify({'ok': True, 'files': result})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
 
@@ -621,26 +645,67 @@ def upload_to_webdav():
     d = request.json
     local_path = d.get('local_path')
     remote_path = d.get('remote_path')
+    system_id = d.get('system_id')  # None=dashboard
     if not local_path or not os.path.exists(local_path):
         return jsonify({'ok': False, 'error': '本地文件不存在'}), 400
     try:
         client = _get_webdav_client()
-        client.upload_sync(remote_path=remote_path or os.path.basename(local_path), local_path=local_path)
+        filename = remote_path or os.path.basename(local_path)
+        remote_dir = _webdav_remote_dir(system_id)
+        client.mkdir(remote_dir)
+        client.upload_sync(remote_path=remote_dir + filename, local_path=local_path)
         return jsonify({'ok': True})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500
 
 @app.route('/api/webdav/download', methods=['POST'])
 def download_from_webdav():
+    """从云端下载备份文件，支持下载后恢复"""
     d = request.json
     remote_path = d.get('remote_path')
-    local_dir = d.get('local_dir')
+    system_id = d.get('system_id')  # None=dashboard
+    do_restore = d.get('restore', False)
     if not remote_path:
         return jsonify({'ok': False, 'error': '缺少 remote_path'}), 400
-    local_path = os.path.join(local_dir or '/tmp', os.path.basename(remote_path))
+
+    # 确定本地备份目录和目标数据库
+    if system_id is None:
+        backup_dir = os.path.join(BACKUP_BASE, 'dashboard')
+        target_db = DB_PATH
+        service_name = None
+    else:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        row = conn.execute('SELECT service_name, db_path FROM systems WHERE id=?', (system_id,)).fetchone()
+        conn.close()
+        if not row:
+            return jsonify({'ok': False, 'error': '系统不存在'}), 400
+        backup_dir = os.path.join(BACKUP_BASE, row['service_name'])
+        target_db = row['db_path']
+        service_name = row['service_name']
+    os.makedirs(backup_dir, exist_ok=True)
+
+    local_path = os.path.join(backup_dir, os.path.basename(remote_path))
     try:
         client = _get_webdav_client()
         client.download_sync(remote_path=remote_path, local_path=local_path)
+
+        if do_restore:
+            # 先停止服务
+            if service_name:
+                _systemctl(['stop', service_name])
+                time.sleep(1)
+            # 预恢复快照
+            pre_name = 'pre_restore_' + _backup_filename()
+            pre_path = os.path.join(backup_dir, pre_name)
+            shutil.copy2(target_db, pre_path)
+            # 恢复
+            shutil.copy2(local_path, target_db)
+            # 重启服务
+            if service_name:
+                _systemctl(['start', service_name])
+            return jsonify({'ok': True, 'restored': True, 'local_path': local_path})
+
         return jsonify({'ok': True, 'local_path': local_path})
     except Exception as e:
         return jsonify({'ok': False, 'error': str(e)}), 500

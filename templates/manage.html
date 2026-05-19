@@ -274,16 +274,21 @@
 
     <!-- Backup List Modal -->
     <div id="backup-list-modal" class="fixed inset-0 modal-overlay z-50 hidden items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg fade-in">
-            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-xl fade-in flex flex-col max-h-[85vh]">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
                 <h2 class="text-base font-semibold text-slate-800" id="backup-list-title">备份列表</h2>
                 <div class="flex items-center gap-2">
-                    <button onclick="loadBackupList()" class="btn btn-ghost text-xs"><i data-lucide="refresh-cw" class="w-3 h-3"></i></button>
+                    <button onclick="loadBackupList()" class="btn btn-ghost text-xs" title="刷新"><i data-lucide="refresh-cw" class="w-3 h-3"></i></button>
                     <button onclick="closeBackupListModal()" class="text-slate-300 hover:text-slate-500"><i data-lucide="x" class="w-5 h-5"></i></button>
                 </div>
             </div>
-            <div class="p-6">
-                <div id="backup-list-content" class="space-y-2 max-h-80 overflow-y-auto"></div>
+            <div class="px-6 pt-4 pb-6 overflow-y-auto flex-1">
+                <!-- 本地备份 -->
+                <div class="text-xs font-medium text-slate-400 mb-2">本地备份</div>
+                <div id="backup-list-content" class="space-y-2 mb-4"></div>
+                <!-- 云端备份 -->
+                <div class="text-xs font-medium text-slate-400 mb-2 flex items-center gap-1"><i data-lucide="cloud" class="w-3 h-3"></i> 云端备份</div>
+                <div id="backup-cloud-content" class="space-y-2"></div>
             </div>
         </div>
     </div>
@@ -722,22 +727,89 @@
         async function loadBackupList() {
             if (!currentBackupSystem) return;
             const endpoint = currentBackupSystem.type === 'dashboard' ? '/api/backup/list/dashboard' : `/api/backup/list/${currentBackupSystem.id}`;
+            const localEl = document.getElementById('backup-list-content');
+            const cloudEl = document.getElementById('backup-cloud-content');
+
+            // 加载本地备份
             try {
                 const res = await fetch(endpoint);
                 const backups = await res.json();
-                const el = document.getElementById('backup-list-content');
-                if (backups.length === 0) { el.innerHTML = '<div class="text-center py-8 text-slate-400 text-sm">暂无备份</div>'; return; }
-                el.innerHTML = backups.map(b => `
-                    <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg text-sm">
-                        <div>
-                            <div class="font-mono text-slate-600 text-xs">${b.backup_file}</div>
-                            <div class="text-xs text-slate-400 mt-0.5">${formatFileSize(b.file_size)} · ${formatDateTime(b.created_at)}${b.backup_type==='auto' ? ' <span class="text-blue-400">自动</span>' : ''}</div>
+                if (backups.length === 0) {
+                    localEl.innerHTML = '<div class="text-center py-4 text-slate-300 text-xs">暂无本地备份</div>';
+                } else {
+                    localEl.innerHTML = backups.map(b => `
+                        <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg text-sm">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <i data-lucide="hard-drive" class="w-3.5 h-3.5 text-slate-400 shrink-0"></i>
+                                <div class="min-w-0">
+                                    <div class="font-mono text-slate-600 text-xs truncate">${b.backup_file}</div>
+                                    <div class="text-xs text-slate-400">${formatFileSize(b.file_size)} · ${formatDateTime(b.created_at)}${b.backup_type==='auto' ? ' <span class="text-blue-400">自动</span>' : ''}</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-1 shrink-0">
+                                <button onclick="uploadToWebdav('${b.backup_path}','${b.backup_file}')" class="btn btn-ghost text-xs p-1.5" title="上传到云端"><i data-lucide="cloud-upload" class="w-3 h-3"></i></button>
+                                <button onclick="restoreLocal('${b.backup_path}')" class="btn btn-ghost text-xs p-1.5" title="恢复此备份"><i data-lucide="rotate-ccw" class="w-3 h-3"></i></button>
+                            </div>
                         </div>
-                        <button onclick="uploadToWebdav('${b.backup_path}','${b.backup_file}')" class="btn btn-ghost text-xs" title="上传到云端"><i data-lucide="cloud-upload" class="w-3 h-3"></i></button>
-                    </div>
-                `).join('');
-                lucide.createIcons();
-            } catch { document.getElementById('backup-list-content').innerHTML = '<div class="text-center py-8 text-red-400 text-sm">加载失败</div>'; }
+                    `).join('');
+                }
+            } catch { localEl.innerHTML = '<div class="text-center py-4 text-red-400 text-xs">加载失败</div>'; }
+
+            // 加载云端备份
+            cloudEl.innerHTML = '<div class="text-center py-4 text-slate-300 text-xs"><i data-lucide="loader" class="w-3 h-3 animate-spin inline"></i> 加载中...</div>';
+            try {
+                const sid = currentBackupSystem.type === 'dashboard' ? '' : currentBackupSystem.id;
+                const res2 = await fetch('/api/webdav/list' + (sid ? '?system_id=' + sid : ''));
+                const data = await res2.json();
+                if (!data.ok) {
+                    cloudEl.innerHTML = '<div class="text-center py-4 text-slate-300 text-xs">无法连接云端</div>';
+                } else if (data.files.length === 0) {
+                    cloudEl.innerHTML = '<div class="text-center py-4 text-slate-300 text-xs">暂无云端备份</div>';
+                } else {
+                    cloudEl.innerHTML = data.files.map(f => `
+                        <div class="flex items-center justify-between p-2.5 bg-blue-50 rounded-lg text-sm">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <i data-lucide="cloud" class="w-3.5 h-3.5 text-blue-400 shrink-0"></i>
+                                <div class="min-w-0">
+                                    <div class="font-mono text-slate-600 text-xs truncate">${f.name}</div>
+                                </div>
+                            </div>
+                            <button onclick="restoreFromCloud('${f.path}')" class="btn btn-ghost text-xs p-1.5" title="下载并恢复"><i data-lucide="cloud-download" class="w-3 h-3"></i></button>
+                        </div>
+                    `).join('');
+                }
+            } catch { cloudEl.innerHTML = '<div class="text-center py-4 text-red-400 text-xs">加载失败</div>'; }
+
+            lucide.createIcons();
+        }
+
+        async function restoreLocal(backupPath) {
+            if (!confirm('确认恢复？当前版本将自动备份为 pre_restore_ 文件。')) return;
+            const sid = currentBackupSystem.type === 'dashboard' ? 'dashboard' : currentBackupSystem.id;
+            const endpoint = currentBackupSystem.type === 'dashboard' ? '/api/restore/perform/dashboard' : `/api/restore/perform/${sid}`;
+            try {
+                const res = await fetch(endpoint, {
+                    method:'POST', headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({backup_path: backupPath})
+                });
+                const data = await res.json();
+                showToast(data.ok ? '恢复成功' : (data.error || '恢复失败'), data.ok ? 'success' : 'error');
+                if (data.ok) loadBackupList();
+            } catch { showToast('恢复请求失败', 'error'); }
+        }
+
+        async function restoreFromCloud(remotePath) {
+            if (!confirm('从云端下载并恢复？当前版本将自动备份为 pre_restore_ 文件。')) return;
+            const systemId = currentBackupSystem.type === 'dashboard' ? null : currentBackupSystem.id;
+            try {
+                const res = await fetch('/api/webdav/download', {
+                    method:'POST', headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({remote_path: remotePath, system_id: systemId, restore: true})
+                });
+                const data = await res.json();
+                showToast(data.ok ? (data.restored ? '已从云端恢复' : '已下载') : (data.error || '失败'), data.ok ? 'success' : 'error');
+                if (data.ok) loadBackupList();
+            } catch { showToast('请求失败', 'error'); }
         }
 
         // WebDAV
@@ -786,12 +858,14 @@
         }
         async function uploadToWebdav(localPath, filename) {
             try {
+                const systemId = currentBackupSystem.type === 'dashboard' ? null : currentBackupSystem.id;
                 const res = await fetch('/api/webdav/upload', {
                     method:'POST', headers:{'Content-Type':'application/json'},
-                    body: JSON.stringify({local_path: localPath, remote_path: filename})
+                    body: JSON.stringify({local_path: localPath, remote_path: filename, system_id: systemId})
                 });
                 const data = await res.json();
                 showToast(data.ok ? '已上传到云端' : '上传失败: '+(data.error||''), data.ok ? 'success' : 'error');
+                if (data.ok) loadBackupList();
             } catch { showToast('上传请求失败', 'error'); }
         }
 

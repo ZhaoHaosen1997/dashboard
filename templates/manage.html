@@ -93,6 +93,48 @@
         </div>
     </main>
 
+    <!-- 备份管理 -->
+    <div id="backup-section" class="max-w-5xl mx-auto px-6 pb-8">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <i data-lucide="archive" class="w-4 h-4"></i>
+                数据备份
+            </h3>
+            <button onclick="openWebdavModal()" class="btn btn-ghost text-xs">
+                <i data-lucide="cloud" class="w-3.5 h-3.5"></i>
+                云端配置
+            </button>
+        </div>
+        <!-- Dashboard 自身 -->
+        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100 p-4 mb-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 bg-blue-500 rounded-lg flex items-center justify-center text-white">
+                        <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                    </div>
+                    <div>
+                        <div class="font-medium text-slate-800 text-sm">Dashboard</div>
+                        <div id="dashboard-backup-info" class="text-xs text-slate-400">从未备份</div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1">
+                    <button onclick="manualBackup('dashboard')" class="btn btn-primary text-xs">
+                        <i data-lucide="download" class="w-3 h-3"></i>
+                        备份
+                    </button>
+                    <button onclick="openBackupListModal('dashboard','Dashboard')" class="btn btn-ghost text-xs">
+                        <i data-lucide="list" class="w-3 h-3"></i>
+                    </button>
+                    <button onclick="openRestoreModal('dashboard',null,'Dashboard')" class="btn btn-ghost text-xs">
+                        <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- 各系统 -->
+        <div id="backup-systems-list" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+    </div>
+
     <!-- Edit Modal -->
     <div id="edit-modal" class="fixed inset-0 modal-overlay z-50 hidden items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-md fade-in">
@@ -149,6 +191,36 @@
                         <input type="color" id="color" value="#3b82f6" class="h-9 cursor-pointer">
                     </div>
                 </div>
+                <!-- 备份配置 -->
+                <div class="border-t border-slate-100 pt-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <label class="text-xs font-medium text-slate-500">数据库备份</label>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="backup_enabled" class="sr-only peer" onchange="toggleBackupConfig(this.checked)">
+                            <div class="w-9 h-5 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+                        </label>
+                    </div>
+                    <div id="backup-fields" class="space-y-3 hidden">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-500 mb-1">数据库路径 *</label>
+                            <input type="text" id="db_path" placeholder="/home/zhaohaosen/applications/xxx/data/app.db">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1">备份间隔</label>
+                                <select id="backup_interval" class="bg-white">
+                                    <option value="daily">每日</option>
+                                    <option value="weekly">每周</option>
+                                    <option value="monthly">每月</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-500 mb-1">保留份数</label>
+                                <input type="number" id="backup_keep" value="3" min="1" max="30">
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <div class="flex gap-2 pt-2">
                     <button type="submit" class="btn btn-primary flex-1 justify-center">保存</button>
                     <button type="button" onclick="closeModal()" class="btn btn-ghost flex-1 justify-center">取消</button>
@@ -200,14 +272,90 @@
         </div>
     </div>
 
+    <!-- Backup List Modal -->
+    <div id="backup-list-modal" class="fixed inset-0 modal-overlay z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg fade-in">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h2 class="text-base font-semibold text-slate-800" id="backup-list-title">备份列表</h2>
+                <div class="flex items-center gap-2">
+                    <button onclick="loadBackupList()" class="btn btn-ghost text-xs"><i data-lucide="refresh-cw" class="w-3 h-3"></i></button>
+                    <button onclick="closeBackupListModal()" class="text-slate-300 hover:text-slate-500"><i data-lucide="x" class="w-5 h-5"></i></button>
+                </div>
+            </div>
+            <div class="p-6">
+                <div id="backup-list-content" class="space-y-2 max-h-80 overflow-y-auto"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- WebDAV Modal -->
+    <div id="webdav-modal" class="fixed inset-0 modal-overlay z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md fade-in">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h2 class="text-base font-semibold text-slate-800 flex items-center gap-2">
+                    <i data-lucide="cloud" class="w-4 h-4"></i> 坚果云 WebDAV
+                </h2>
+                <button onclick="closeWebdavModal()" class="text-slate-300 hover:text-slate-500"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <form id="webdav-form" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 mb-1">WebDAV 地址</label>
+                    <input type="url" id="webdav_url" placeholder="https://dav.jianguoyun.com/dav/">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 mb-1">用户名</label>
+                    <input type="text" id="webdav_username" placeholder="your@email.com">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-500 mb-1">应用密码</label>
+                    <input type="password" id="webdav_password" placeholder="坚果云安全设置中的应用密码">
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" onclick="checkWebdav()" class="btn btn-ghost flex-1 justify-center">
+                        <i data-lucide="wifi" class="w-3.5 h-3.5"></i> 测试连接
+                    </button>
+                    <button type="submit" class="btn btn-primary flex-1 justify-center">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Restore Modal -->
+    <div id="restore-modal" class="fixed inset-0 modal-overlay z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg fade-in">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h2 class="text-base font-semibold text-slate-800" id="restore-title">恢复备份</h2>
+                <button onclick="closeRestoreModal()" class="text-slate-300 hover:text-slate-500"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <div class="p-6">
+                <div class="mb-4">
+                    <label class="block text-xs font-medium text-slate-500 mb-2">选择备份文件</label>
+                    <select id="restore-select" class="bg-white"><option value="">加载中...</option></select>
+                </div>
+                <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700 mb-4">
+                    恢复前将自动备份当前版本为 pre_restore_ 文件
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="performRestore()" class="btn btn-danger flex-1 justify-center">
+                        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> 确认恢复
+                    </button>
+                    <button onclick="closeRestoreModal()" class="btn btn-ghost flex-1 justify-center">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         let systems = [];
         let deleteId = null;
         let logSystemId = null;
+        let currentBackupSystem = null;  // {type:'system'|'dashboard', id, name}
+        let currentRestoreSystem = null;
 
         document.addEventListener('DOMContentLoaded', () => {
             lucide.createIcons();
             loadSystems();
+            loadBackupSystems();
         });
 
         async function loadSystems() {
@@ -322,6 +470,11 @@
             document.getElementById('description').value = system?.description || '';
             document.getElementById('icon').value = system?.icon || 'box';
             document.getElementById('color').value = system?.color || '#3b82f6';
+            document.getElementById('db_path').value = system?.db_path || '';
+            document.getElementById('backup_enabled').checked = system?.backup_enabled == 1;
+            document.getElementById('backup_interval').value = system?.backup_interval || 'daily';
+            document.getElementById('backup_keep').value = system?.backup_keep || 3;
+            toggleBackupConfig(system?.backup_enabled == 1);
             lucide.createIcons();
             document.getElementById('name').focus();
         }
@@ -346,7 +499,11 @@
                 service_name: document.getElementById('service_name').value || null,
                 description: document.getElementById('description').value,
                 icon: document.getElementById('icon').value,
-                color: document.getElementById('color').value
+                color: document.getElementById('color').value,
+                db_path: document.getElementById('db_path').value || null,
+                backup_enabled: document.getElementById('backup_enabled').checked ? 1 : 0,
+                backup_interval: document.getElementById('backup_interval').value || 'daily',
+                backup_keep: parseInt(document.getElementById('backup_keep').value) || 3
             };
 
             const url = id ? `/api/systems/${id}` : '/api/systems';
@@ -468,8 +625,213 @@
                 closeModal();
                 closeDeleteModal();
                 closeLogModal();
+                closeBackupListModal();
+                closeWebdavModal();
+                closeRestoreModal();
             }
         });
+
+        // ==================== 备份管理 JS ====================
+
+        function toggleBackupConfig(enabled) {
+            document.getElementById('backup-fields').classList.toggle('hidden', !enabled);
+        }
+
+        function formatFileSize(bytes) {
+            if (!bytes) return '0 B';
+            const k = 1024, sizes = ['B','KB','MB','GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        function formatDateTime(iso) {
+            const d = new Date(iso);
+            return d.toLocaleString('zh-CN', {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'});
+        }
+
+        async function loadBackupSystems() {
+            // 加载 Dashboard 上次备份信息
+            try {
+                const res = await fetch('/api/backup/list/dashboard');
+                const backups = await res.json();
+                const info = document.getElementById('dashboard-backup-info');
+                if (backups.length > 0) {
+                    info.textContent = '上次: ' + formatDateTime(backups[0].created_at) + ' · ' + formatFileSize(backups[0].file_size);
+                } else {
+                    info.textContent = '从未备份';
+                }
+            } catch {}
+
+            // 渲染各系统备份卡片
+            const list = document.getElementById('backup-systems-list');
+            const res2 = await fetch('/api/systems');
+            const allSystems = await res2.json();
+            const backupSystems = allSystems.filter(s => s.db_path);
+
+            if (backupSystems.length === 0) {
+                list.innerHTML = '<div class="text-center py-8 text-slate-400 text-sm col-span-2">暂无配置备份的系统<br><span class="text-xs">编辑系统 → 开启备份并填写数据库路径</span></div>';
+                lucide.createIcons();
+                return;
+            }
+
+            list.innerHTML = backupSystems.map(s => `
+                <div class="bg-white rounded-xl border border-slate-200/80 p-4">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white" style="background:${s.color}">
+                                <i data-lucide="${s.icon}" class="w-4 h-4"></i>
+                            </div>
+                            <div>
+                                <div class="font-medium text-slate-800 text-sm">${s.name}</div>
+                                <div class="text-xs text-slate-400">${s.last_backup ? '上次: '+formatDateTime(s.last_backup) : '从未备份'}</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <button onclick="manualBackup(${s.id})" class="btn btn-primary text-xs" title="立即备份"><i data-lucide="download" class="w-3 h-3"></i></button>
+                            <button onclick="openBackupListModal(${s.id},'${s.name}')" class="btn btn-ghost text-xs" title="备份列表"><i data-lucide="list" class="w-3 h-3"></i></button>
+                            <button onclick="openRestoreModal('system',${s.id},'${s.name}')" class="btn btn-ghost text-xs" title="恢复"><i data-lucide="rotate-ccw" class="w-3 h-3"></i></button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        async function manualBackup(idOrDashboard) {
+            const endpoint = idOrDashboard === 'dashboard' ? '/api/backup/perform/dashboard' : `/api/backup/perform/${idOrDashboard}`;
+            try {
+                const res = await fetch(endpoint, {method:'POST'});
+                const data = await res.json();
+                showToast(data.ok ? `备份成功: ${data.filename}` : (data.error || '备份失败'), data.ok ? 'success' : 'error');
+                if (data.ok) loadBackupSystems();
+            } catch { showToast('备份请求失败', 'error'); }
+        }
+
+        // 备份列表弹窗
+        function openBackupListModal(id, name) {
+            currentBackupSystem = { type: id === 'dashboard' ? 'dashboard' : 'system', id, name };
+            document.getElementById('backup-list-title').textContent = name + ' - 备份列表';
+            document.getElementById('backup-list-modal').classList.remove('hidden');
+            document.getElementById('backup-list-modal').classList.add('flex');
+            loadBackupList();
+        }
+        function closeBackupListModal() {
+            document.getElementById('backup-list-modal').classList.add('hidden');
+            document.getElementById('backup-list-modal').classList.remove('flex');
+        }
+        async function loadBackupList() {
+            if (!currentBackupSystem) return;
+            const endpoint = currentBackupSystem.type === 'dashboard' ? '/api/backup/list/dashboard' : `/api/backup/list/${currentBackupSystem.id}`;
+            try {
+                const res = await fetch(endpoint);
+                const backups = await res.json();
+                const el = document.getElementById('backup-list-content');
+                if (backups.length === 0) { el.innerHTML = '<div class="text-center py-8 text-slate-400 text-sm">暂无备份</div>'; return; }
+                el.innerHTML = backups.map(b => `
+                    <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg text-sm">
+                        <div>
+                            <div class="font-mono text-slate-600 text-xs">${b.backup_file}</div>
+                            <div class="text-xs text-slate-400 mt-0.5">${formatFileSize(b.file_size)} · ${formatDateTime(b.created_at)}${b.backup_type==='auto' ? ' <span class="text-blue-400">自动</span>' : ''}</div>
+                        </div>
+                        <button onclick="uploadToWebdav('${b.backup_path}','${b.backup_file}')" class="btn btn-ghost text-xs" title="上传到云端"><i data-lucide="cloud-upload" class="w-3 h-3"></i></button>
+                    </div>
+                `).join('');
+                lucide.createIcons();
+            } catch { document.getElementById('backup-list-content').innerHTML = '<div class="text-center py-8 text-red-400 text-sm">加载失败</div>'; }
+        }
+
+        // WebDAV
+        function openWebdavModal() {
+            document.getElementById('webdav-modal').classList.remove('hidden');
+            document.getElementById('webdav-modal').classList.add('flex');
+            loadWebdavConfig();
+        }
+        function closeWebdavModal() {
+            document.getElementById('webdav-modal').classList.add('hidden');
+            document.getElementById('webdav-modal').classList.remove('flex');
+        }
+        async function loadWebdavConfig() {
+            try {
+                const res = await fetch('/api/webdav/config');
+                const data = await res.json();
+                if (data.configured) {
+                    document.getElementById('webdav_url').value = data.webdav_url || '';
+                    document.getElementById('webdav_username').value = data.username || '';
+                    document.getElementById('webdav_password').value = '';
+                }
+            } catch {}
+        }
+        document.getElementById('webdav-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            try {
+                const res = await fetch('/api/webdav/config', {
+                    method:'POST', headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({
+                        webdav_url: document.getElementById('webdav_url').value,
+                        username: document.getElementById('webdav_username').value,
+                        password: document.getElementById('webdav_password').value
+                    })
+                });
+                const data = await res.json();
+                if (data.ok) { closeWebdavModal(); showToast('WebDAV 配置已保存', 'success'); }
+                else showToast(data.error || '保存失败', 'error');
+            } catch { showToast('请求失败', 'error'); }
+        });
+        async function checkWebdav() {
+            try {
+                const res = await fetch('/api/webdav/check', {method:'POST'});
+                const data = await res.json();
+                showToast(data.ok ? '连接成功' : '连接失败: '+data.error, data.ok ? 'success' : 'error');
+            } catch { showToast('请求失败', 'error'); }
+        }
+        async function uploadToWebdav(localPath, filename) {
+            try {
+                const res = await fetch('/api/webdav/upload', {
+                    method:'POST', headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({local_path: localPath, remote_path: filename})
+                });
+                const data = await res.json();
+                showToast(data.ok ? '已上传到云端' : '上传失败: '+(data.error||''), data.ok ? 'success' : 'error');
+            } catch { showToast('上传请求失败', 'error'); }
+        }
+
+        // 恢复弹窗
+        function openRestoreModal(type, id, name) {
+            currentRestoreSystem = {type, id, name};
+            document.getElementById('restore-title').textContent = name + ' - 恢复备份';
+            document.getElementById('restore-modal').classList.remove('hidden');
+            document.getElementById('restore-modal').classList.add('flex');
+            loadRestoreBackups();
+        }
+        function closeRestoreModal() {
+            document.getElementById('restore-modal').classList.add('hidden');
+            document.getElementById('restore-modal').classList.remove('flex');
+        }
+        async function loadRestoreBackups() {
+            const endpoint = currentRestoreSystem.type === 'dashboard' ? '/api/backup/list/dashboard' : `/api/backup/list/${currentRestoreSystem.id}`;
+            try {
+                const res = await fetch(endpoint);
+                const backups = await res.json();
+                const sel = document.getElementById('restore-select');
+                if (backups.length === 0) { sel.innerHTML = '<option value="">暂无备份</option>'; return; }
+                sel.innerHTML = backups.map(b => `<option value="${b.backup_path}">${b.backup_file} (${formatFileSize(b.file_size)}) - ${formatDateTime(b.created_at)}</option>`).join('');
+            } catch { document.getElementById('restore-select').innerHTML = '<option value="">加载失败</option>'; }
+        }
+        async function performRestore() {
+            const path = document.getElementById('restore-select').value;
+            if (!path) { showToast('请选择备份文件', 'error'); return; }
+            if (!confirm('确认恢复？当前版本将自动备份。')) return;
+            const endpoint = currentRestoreSystem.type === 'dashboard' ? '/api/restore/perform/dashboard' : `/api/restore/perform/${currentRestoreSystem.id}`;
+            try {
+                const res = await fetch(endpoint, {
+                    method:'POST', headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({backup_path: path})
+                });
+                const data = await res.json();
+                if (data.ok) { closeRestoreModal(); showToast('恢复成功', 'success'); loadBackupSystems(); }
+                else showToast(data.error || '恢复失败', 'error');
+            } catch { showToast('恢复请求失败', 'error'); }
+        }
     </script>
 </body>
 </html>

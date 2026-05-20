@@ -1,0 +1,35 @@
+server:
+  host: '0.0.0.0'
+  port: 8850
+  debug: true
+
+database:
+  path: 'config.db'
+
+encryption:
+  key_dir: '~/.dashboard'
+
+backup:
+  base_dir: '/home/zhaohaosen/backup'
+  default_interval: 'daily'
+  default_keep: 3
+  interval_days:
+    daily: 1
+    weekly: 7
+    monthly: 30
+  check_debounce: 3600
+
+metrics:
+  interval: 300
+  retention_days: 30
+  max_points: 100
+
+timeout:
+  status_check: 3
+  systemctl: 10
+  journalctl: 5
+
+service_labels:
+  start: 启动
+  stop: 停止
+  restart: 重启

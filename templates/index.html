@@ -222,7 +222,10 @@
 
             const id = parseInt(card.dataset.id);
             const s = systems.find(x => x.id === id);
-            if (s && s.url) window.open(s.url, '_blank');
+            if (s && s.url) {
+                const url = s.url.replace('localhost', location.hostname);
+                window.open(url, '_blank');
+            }
         });
 
         // Metrics

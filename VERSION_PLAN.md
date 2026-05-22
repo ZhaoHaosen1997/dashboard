@@ -133,7 +133,106 @@
 
 ---
 
-## v0.5 - Dashboard MCP Server 🤖
+## v0.5.1 - WSL 性能监控增强 ✅
+
+**目标**：大幅扩展监控范围，覆盖 GPU（大模型推理）、磁盘 I/O、网络、进程等
+
+### 新增监控指标
+- [x] GPU 监控（NVIDIA）
+  - [x] GPU 利用率（%）
+  - [x] GPU 显存使用量/总量
+  - [x] GPU 温度
+  - [x] GPU 功耗（如有）
+- [x] 磁盘 I/O
+  - [x] 读写速率（MB/s）
+  - [ ] IOPS（可选）
+- [x] 网络 I/O
+  - [x] 上传/下载速率（MB/s）
+  - [x] 总发送/接收字节数（见 v0.5.2）
+- [x] 内存详情
+  - [x] 已用 / 缓存 / 可用
+  - [x] Swap 使用量
+- [x] 进程 Top-N
+  - [x] CPU 占用 Top 5
+  - [x] 内存占用 Top 5
+- [x] 负载（load average）
+
+### 前端展示
+- [x] 监控面板重新设计（网格布局）
+- [x] GPU 卡片高亮（有大模型运行时）
+- [x] 历史趋势图（24h 折线图）
+- [x] 网卡/磁盘 I/O 实时速率
+
+### 技术方案
+| 指标 | 实现方式 |
+|------|----------|
+| GPU | `pynvml`（NVIDIA）或 `nvidia-ml-py`，WSL 内调用 `nvidia-smi` |
+| 磁盘 I/O | `psutil.disk_io_counters()` |
+| 网络 I/O | `psutil.net_io_counters()` |
+| 进程 Top | `psutil.process_iter()` + sorted |
+| 负载 | `os.getloadavg()`（Linux） |
+
+### 注意事项
+- GPU 监控在 WSL2 下需要 NVIDIA CUDA 驱动支持，需检测可用性
+- 采集频率保持 5 分钟，实时展示仍然 30s 刷新
+- 历史数据量增大，需评估数据库存储策略
+
+---
+
+## v0.5.2 - 网络流量深度监控 ✅
+
+**目标**：系统级 + 进程级 + 连接级三层网络监控，发现未知入访
+
+### 数据采集层 (WSL 后台线程)
+- [x] **vnstat 集成** — 读取 `/proc/net/dev` 计数器，不受采样损失
+  - 监控接口：eth1（主网卡）+ tailscale0（VPN）
+  - 提供按小时/天的出入流量汇总
+  - Dashboard 每小时解析 vnstat JSON → `net_traffic` 表
+- [x] **nethogs 进程级流量** — 每 60 秒采集一次
+  - 按 PID/进程名 统计 sent_bytes / recv_bytes
+  - 存入 `net_process` 表，支持按小时聚合
+- [x] **ss 连接追踪** — 每 60 秒快照
+  - 记录所有 TCP/UDP 连接的 remote_ip:port → 进程映射
+  - 存入 `net_conn` 表
+- [x] **异常检测**
+  - 新 IP 检测：过去 24h 未见过的远程 IP → `net_alert`
+  - 每天每个 IP 只告警一次（去重）
+
+### 数据库新增
+| 表 | 用途 | 保留周期 |
+|------|------|----------|
+| `net_traffic` | 按小时/接口 流量汇总 | 90 天 |
+| `net_process` | 按进程/分钟 流量采样 | 30 天 |
+| `net_conn` | 连接快照 (remote IP + 端口 + 进程) | 7 天 |
+| `net_alert` | 异常告警 | 90 天 |
+
+### API 端点
+| 端点 | 功能 |
+|------|------|
+| `GET /api/net/summary?hours=24` | 概览：总流量、Top10 进程、最新告警、活跃连接数 |
+| `GET /api/net/traffic?days=7&interface=eth1&granularity=hour` | 流量趋势数据（hour/day） |
+| `GET /api/net/processes?hours=24&limit=20` | 进程流量排行 + Top5 进程逐小时时序 |
+| `GET /api/net/connections?hours=24&limit=100&group_by=ip` | 连接分析（按 IP 或按进程聚合） |
+| `GET /api/net/alerts?days=7&unacknowledged=1` | 异常告警列表 |
+| `POST /api/net/alerts/<id>/ack` | 确认告警 |
+
+### 技术方案
+| 组件 | 实现 |
+|------|------|
+| vnstat | 系统服务 `vnstatd`，每小时 `vnstat --json h` |
+| nethogs | 子进程 tracemode `nethogs -t -d 60 eth1`，需 `cap_net_admin,cap_net_raw` |
+| ss | 每分钟 `ss -tunap` 子进程 |
+| 采集线程 | `net_collector.py` — 3 个守护线程 + 1 个清理线程 |
+| 前端 | 待 v0.5 前端重构时一并展示 |
+
+### 已知限制
+- nethogs 进程名显示完整路径（如 `/home/zhaohaosen/.hermes/hermes-agent/venv/bin/python`），待优化为 basename
+- 首次运行 24h 内所有 IP 都是"新 IP"，告警量较大（正常现象，随时间推移减少）
+- WSL2 环境下 nethogs 只能看到 WSL 内部的网络流量
+
+---
+
+## v0.6 - Dashboard MCP Server 🤖
 
 **目标**：让 Hermes 能调用 Dashboard 的能力
 
@@ -142,14 +241,14 @@
   - `list_services` - 列出所有服务
   - `check_service_status` - 检测指定服务状态
   - `restart_service` - 重启服务
-  - `get_wsl_metrics` - 获取 WSL 性能数据
+  - `get_wsl_metrics` - 获取 WSL 性能数据（含 GPU）
   - `get_service_logs` - 获取服务日志
 - [ ] 在 Hermes 中配置 Dashboard MCP
 - [ ] 测试：QQ 发消息 → Hermes → Dashboard MCP → 返回结果
 
 ---
 
-## v0.6 - AI 告警通知 🔔
+## v0.7 - AI 告警通知 🔔
 
 **目标**：服务异常自动通过 QQ 推送
 
@@ -207,4 +306,4 @@
 
 ---
 
-_最后更新：2026-05-19_
+_最后更新：2026-05-22_

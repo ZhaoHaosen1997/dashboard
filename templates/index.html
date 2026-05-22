@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script src="/static/js/tailwind.js"></script>
+    <script src="/static/js/lucide.min.js"></script>
     <style>
         * { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
         .drag-over { background: #f0f9ff !important; border-color: #3b82f6 !important; }
@@ -28,6 +28,14 @@
         .card .drag-handle:active { cursor: grabbing; }
         .fade-in { animation: fadeIn 0.25s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Metric cards */
+        .metric-card {
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .metric-card:hover { transform: translateY(-1px); box-shadow: 0 4px 20px -4px rgba(0,0,0,0.1); }
+
         .sparkline { width: 100%; height: 28px; }
         .range-btn {
             padding: 1px 7px; font-size: 11px; border-radius: 5px; cursor: pointer;
@@ -35,6 +43,27 @@
         }
         .range-btn:hover { color: #64748b; }
         .range-btn.active { color: #334155; background: #f1f5f9; }
+
+        /* Detail modal */
+        .modal-backdrop {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.3); backdrop-filter: blur(4px);
+            z-index: 50; display: flex; align-items: center; justify-content: center;
+        }
+        .modal-content {
+            background: white; border-radius: 16px; width: 90%; max-width: 720px; max-height: 85vh;
+            padding: 24px; box-shadow: 0 25px 60px -12px rgba(0,0,0,0.25);
+            display: flex; flex-direction: column;
+        }
+        .detail-chart { width: 100%; height: 220px; }
+        /* Process table */
+        .proc-header { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+        /* GPU sub-metric tabs */
+        .gpu-sub-btn {
+            padding: 2px 10px; font-size: 11px; border-radius: 6px; cursor: pointer;
+            color: #94a3b8; background: transparent; border: 1px solid #e2e8f0; transition: all 0.15s;
+        }
+        .gpu-sub-btn:hover { color: #64748b; border-color: #cbd5e1; }
+        .gpu-sub-btn.active { color: #6d28d9; background: #f5f3ff; border-color: #c4b5fd; }
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen">
@@ -84,9 +113,11 @@
                 </div>
                 <span id="uptime" class="text-xs text-slate-300"></span>
             </div>
+
+            <!-- Row1: CPU / Memory / GPU -->
             <div class="grid grid-cols-3 gap-4">
                 <!-- CPU -->
-                <div class="bg-white rounded-xl border border-slate-200/80 p-4">
+                <div class="metric-card bg-white rounded-xl border border-slate-200/80 p-4" onclick="showDetail('cpu')">
                     <div class="flex items-center gap-2 mb-3">
                         <div class="w-7 h-7 rounded-md bg-blue-50 flex items-center justify-center">
                             <i data-lucide="cpu" class="w-3.5 h-3.5 text-blue-400"></i>
@@ -100,7 +131,7 @@
                     <svg class="sparkline mt-2" id="cpu-spark"></svg>
                 </div>
                 <!-- Memory -->
-                <div class="bg-white rounded-xl border border-slate-200/80 p-4">
+                <div class="metric-card bg-white rounded-xl border border-slate-200/80 p-4" onclick="showDetail('mem')">
                     <div class="flex items-center gap-2 mb-3">
                         <div class="w-7 h-7 rounded-md bg-emerald-50 flex items-center justify-center">
                             <i data-lucide="memory-stick" class="w-3.5 h-3.5 text-emerald-400"></i>
@@ -114,20 +145,101 @@
                     </div>
                     <svg class="sparkline mt-2" id="mem-spark"></svg>
                 </div>
-                <!-- Disk -->
-                <div class="bg-white rounded-xl border border-slate-200/80 p-4">
+                <!-- GPU -->
+                <div class="metric-card bg-white rounded-xl border border-slate-200/80 p-4" onclick="showDetail('gpu')" id="gpu-card">
+                    <div class="flex items-center gap-2 mb-3">
+                        <div class="w-7 h-7 rounded-md bg-purple-50 flex items-center justify-center">
+                            <i data-lucide="gpu" class="w-3.5 h-3.5 text-purple-400"></i>
+                        </div>
+                        <span class="text-xs text-slate-400">GPU</span>
+                        <span id="gpu-name" class="text-[10px] text-slate-300 ml-auto truncate max-w-[80px]"></span>
+                    </div>
+                    <div id="gpu-body">
+                        <div class="text-2xl font-bold text-slate-800" id="gpu-util-val">--</div>
+                        <div class="text-xs text-slate-400 mt-0.5" id="gpu-mem-detail"></div>
+                        <div class="mt-1.5 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div id="gpu-mem-bar" class="h-full bg-purple-400 rounded-full transition-all duration-500" style="width:0%"></div>
+                        </div>
+                        <svg class="sparkline mt-2" id="gpu-spark"></svg>
+                    </div>
+                    <div id="gpu-unavailable" class="hidden text-xs text-slate-300 mt-4">N/A</div>
+                </div>
+            </div>
+
+            <!-- Row2: Disk IO / Net IO / Load -->
+            <div class="grid grid-cols-3 gap-4 mt-4">
+                <!-- Disk IO -->
+                <div class="metric-card bg-white rounded-xl border border-slate-200/80 p-4" onclick="showDetail('disk_io')">
                     <div class="flex items-center gap-2 mb-3">
                         <div class="w-7 h-7 rounded-md bg-amber-50 flex items-center justify-center">
                             <i data-lucide="hard-drive" class="w-3.5 h-3.5 text-amber-400"></i>
                         </div>
-                        <span class="text-xs text-slate-400">Disk</span>
+                        <span class="text-xs text-slate-400">Disk IO</span>
                     </div>
-                    <div class="text-2xl font-bold text-slate-800" id="disk-val">--</div>
-                    <div class="text-xs text-slate-400 mt-0.5" id="disk-detail"></div>
-                    <div class="mt-1.5 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div id="disk-bar" class="h-full bg-amber-400 rounded-full transition-all duration-500" style="width:0%"></div>
+                    <div class="flex justify-between text-sm">
+                        <div>
+                            <span class="text-slate-300 text-[10px]">READ</span>
+                            <div class="font-semibold text-slate-700" id="dio-read">--</div>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-slate-300 text-[10px]">WRITE</span>
+                            <div class="font-semibold text-slate-700" id="dio-write">--</div>
+                        </div>
                     </div>
-                    <svg class="sparkline mt-2" id="disk-spark"></svg>
+                </div>
+                <!-- Net IO -->
+                <div class="metric-card bg-white rounded-xl border border-slate-200/80 p-4" onclick="showDetail('net_io')">
+                    <div class="flex items-center gap-2 mb-3">
+                        <div class="w-7 h-7 rounded-md bg-sky-50 flex items-center justify-center">
+                            <i data-lucide="wifi" class="w-3.5 h-3.5 text-sky-400"></i>
+                        </div>
+                        <span class="text-xs text-slate-400">Network</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <div>
+                            <span class="text-slate-300 text-[10px]">UP</span>
+                            <div class="font-semibold text-slate-700" id="nio-sent">--</div>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-slate-300 text-[10px]">DOWN</span>
+                            <div class="font-semibold text-slate-700" id="nio-recv">--</div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Load Average -->
+                <div class="metric-card bg-white rounded-xl border border-slate-200/80 p-4" onclick="showDetail('load')">
+                    <div class="flex items-center gap-2 mb-3">
+                        <div class="w-7 h-7 rounded-md bg-rose-50 flex items-center justify-center">
+                            <i data-lucide="gauge" class="w-3.5 h-3.5 text-rose-400"></i>
+                        </div>
+                        <span class="text-xs text-slate-400">Load</span>
+                    </div>
+                    <div class="flex gap-2 text-sm">
+                        <div class="text-center flex-1">
+                            <span class="text-slate-300 text-[10px]">1m</span>
+                            <div class="font-semibold text-slate-700" id="load-1">--</div>
+                        </div>
+                        <div class="text-center flex-1">
+                            <span class="text-slate-300 text-[10px]">5m</span>
+                            <div class="font-semibold text-slate-700" id="load-5">--</div>
+                        </div>
+                        <div class="text-center flex-1">
+                            <span class="text-slate-300 text-[10px]">15m</span>
+                            <div class="font-semibold text-slate-700" id="load-15">--</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Row3: Top Processes -->
+            <div class="mt-4 bg-white rounded-xl border border-slate-200/80 p-4">
+                <div class="flex items-center gap-2 mb-3">
+                    <i data-lucide="list" class="w-3.5 h-3.5 text-slate-300"></i>
+                    <span class="text-xs text-slate-400">Top Processes</span>
+                    <button id="proc-expand-btn" onclick="toggleProcesses()" class="ml-auto text-xs text-blue-500 hover:text-blue-700 hidden">展开全部</button>
+                </div>
+                <div id="top-processes" class="text-xs text-slate-500">
+                    <span class="text-slate-300">加载中...</span>
                 </div>
             </div>
 
@@ -142,12 +254,100 @@
                 </div>
             </div>
         </div>
+
+        <!-- Network Monitor -->
+        <div class="mt-16" id="net-monitor">
+            <div class="flex items-center gap-2 mb-4">
+                <i data-lucide="network" class="w-4 h-4 text-slate-300"></i>
+                <h2 class="text-sm font-medium text-slate-400">网络监控</h2>
+                <button onclick="loadNetData()" class="ml-auto p-1.5 rounded-md hover:bg-slate-100 text-slate-300 hover:text-slate-500 transition-colors" title="刷新">
+                    <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+                </button>
+            </div>
+
+            <!-- Row: Traffic overview + Top processes -->
+            <div class="grid grid-cols-2 gap-4">
+                <!-- Traffic card -->
+                <div class="metric-card bg-white rounded-xl border border-slate-200/80 p-4">
+                    <div class="flex items-center gap-2 mb-3">
+                        <div class="w-7 h-7 rounded-md bg-sky-50 flex items-center justify-center">
+                            <i data-lucide="bar-chart-3" class="w-3.5 h-3.5 text-sky-400"></i>
+                        </div>
+                        <span class="text-xs text-slate-400">今日流量</span>
+                    </div>
+                    <div id="net-traffic-content">
+                        <span class="text-xs text-slate-300">加载中...</span>
+                    </div>
+                </div>
+                <!-- Top network processes -->
+                <div class="metric-card bg-white rounded-xl border border-slate-200/80 p-4">
+                    <div class="flex items-center gap-2 mb-3">
+                        <div class="w-7 h-7 rounded-md bg-teal-50 flex items-center justify-center">
+                            <i data-lucide="arrow-up-down" class="w-3.5 h-3.5 text-teal-400"></i>
+                        </div>
+                        <span class="text-xs text-slate-400">进程流量 Top</span>
+                    </div>
+                    <div id="net-processes" class="text-xs text-slate-500">
+                        <span class="text-slate-300">加载中...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Row: Alerts -->
+            <div id="net-alerts-area" class="mt-4 bg-white rounded-xl border border-slate-200/80 p-4 hidden">
+                <div class="flex items-center gap-2 mb-3">
+                    <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-400"></i>
+                    <span class="text-xs text-slate-400">异常告警</span>
+                    <span id="net-alert-count" class="ml-auto text-[10px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-full hidden"></span>
+                </div>
+                <div id="net-alerts" class="space-y-1 text-xs text-slate-500"></div>
+            </div>
+        </div>
     </main>
+
+    <!-- Detail Modal (hidden by default) -->
+    <div id="detail-modal" class="modal-backdrop hidden" onclick="closeDetail(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-2">
+                    <i id="detail-icon" data-lucide="cpu" class="w-5 h-5 text-slate-400"></i>
+                    <h3 id="detail-title" class="text-lg font-semibold text-slate-800"></h3>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span id="detail-range-label" class="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded"></span>
+                    <button onclick="closeDetail()" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors">
+                        <i data-lucide="x" class="w-4 h-4 text-slate-400"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="flex items-end gap-4 mb-4">
+                <div class="text-4xl font-bold text-slate-800" id="detail-current">--</div>
+                <div class="text-sm text-slate-400 pb-1">
+                    <span id="detail-stat"></span>
+                </div>
+            </div>
+            <!-- Sub-metric tabs (e.g. GPU: util / mem / temp / power) -->
+            <div id="detail-sub" class="hidden flex gap-1 mb-3"></div>
+            <svg class="detail-chart" id="detail-spark"></svg>
+            <div class="mt-2 text-[10px] text-slate-300 text-center">滚轮缩放时间范围 · 点击外部关闭</div>
+        </div>
+    </div>
 
     <script>
         let systems = [];
         let draggedItem = null;
         let dragStartX = 0, dragStartY = 0;
+        let currentRange = 24;
+        let currentEvents = [];
+        let lastMetrics = null;
+        let showAllProc = false;
+
+        // Detail modal state
+        let detailInterval = null;
+        let detailType = '';
+        let detailHours = 24;
+        const DETAIL_HOURS = [1, 6, 24, 72, 168, 720]; // 1h, 6h, 24h, 3d, 7d, 30d
+        const DETAIL_HOURS_LABEL = {'1':'1h', '6':'6h', '24':'24h', '72':'3d', '168':'7d', '720':'30d'};
 
         document.addEventListener('DOMContentLoaded', () => {
             lucide.createIcons();
@@ -155,10 +355,14 @@
             loadMetrics();
             loadHistory();
             loadEvents();
+            loadNetData();
             setInterval(loadMetrics, 30000);
-            setInterval(loadHistory, 300000); // refresh sparkline every 5min
+            setInterval(loadHistory, 300000);
+            setInterval(loadEvents, 60000);
+            setInterval(loadNetData, 120000);
         });
 
+        // ===== Systems =====
         async function loadSystems() {
             const res = await fetch('/api/systems');
             systems = await res.json();
@@ -170,14 +374,7 @@
         function renderSystems() {
             const grid = document.getElementById('systems-grid');
             const empty = document.getElementById('empty-state');
-
-            if (systems.length === 0) {
-                grid.innerHTML = '';
-                empty.classList.remove('hidden');
-                lucide.createIcons();
-                return;
-            }
-
+            if (systems.length === 0) { grid.innerHTML = ''; empty.classList.remove('hidden'); lucide.createIcons(); return; }
             empty.classList.add('hidden');
             grid.innerHTML = systems.map(s => `
                 <div class="card bg-white rounded-xl border border-slate-200/80 p-5 fade-in"
@@ -186,8 +383,7 @@
                      ondragover="handleDragOver(event)" ondrop="handleDrop(event)"
                      onmousedown="onCardMouseDown(event, ${s.id})">
                     <div class="flex items-start justify-between mb-3">
-                        <div class="w-10 h-10 rounded-lg flex items-center justify-center text-white"
-                             style="background: ${s.color}">
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center text-white" style="background: ${s.color}">
                             <i data-lucide="${s.icon}" class="w-5 h-5"></i>
                         </div>
                         <span class="status-dot ${s.online ? 'status-online' : 'status-offline'}"
@@ -197,70 +393,146 @@
                         <h3 class="font-semibold text-slate-800 text-[15px] leading-tight">${s.name}</h3>
                         <p class="text-sm text-slate-400 mt-1 leading-snug">${s.description || '暂无描述'}</p>
                     </div>
-                    <div class="drag-handle" title="拖拽排序">
-                        <i data-lucide="grip-vertical" class="w-4 h-4"></i>
-                    </div>
-                </div>
-            `).join('');
-
+                    <div class="drag-handle" title="拖拽排序"><i data-lucide="grip-vertical" class="w-4 h-4"></i></div>
+                </div>`).join('');
             lucide.createIcons();
             updateCounts();
         }
 
-        // 区分点击和拖拽
-        function onCardMouseDown(e, id) {
-            dragStartX = e.clientX;
-            dragStartY = e.clientY;
-        }
+        function onCardMouseDown(e, id) { dragStartX = e.clientX; dragStartY = e.clientY; }
 
         document.addEventListener('click', (e) => {
             const card = e.target.closest('.card');
             if (!card || e.target.closest('.drag-handle')) return;
-            // 如果拖拽距离超过阈值，不触发点击
-            const dist = Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY);
-            if (dist > 5) return;
-
+            if (Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY) > 5) return;
             const id = parseInt(card.dataset.id);
             const s = systems.find(x => x.id === id);
             if (s && s.url) {
-                const url = s.url.replace('localhost', location.hostname);
-                window.open(url, '_blank');
+                const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+                const targetUrl = isLocal ? s.url : s.url.replace('localhost', location.hostname);
+                window.open(targetUrl, '_blank');
             }
         });
 
-        // Metrics
+        function updateCounts() {
+            document.getElementById('online-count').textContent = systems.filter(s => s.online).length;
+            document.getElementById('total-count').textContent = systems.length;
+        }
+
+        // ===== Metrics =====
         async function loadMetrics() {
             try {
                 const res = await fetch('/api/wsl/metrics');
                 const d = await res.json();
+                lastMetrics = d;
+
+                // CPU
                 document.getElementById('cpu-val').textContent = d.cpu_percent + '%';
                 document.getElementById('cpu-bar').style.width = d.cpu_percent + '%';
                 document.getElementById('cpu-bar').className = `h-full rounded-full transition-all duration-500 ${d.cpu_percent > 80 ? 'bg-red-400' : 'bg-blue-400'}`;
 
+                // Memory
                 document.getElementById('mem-val').textContent = d.memory.percent + '%';
-                document.getElementById('mem-detail').textContent = `${d.memory.used} / ${d.memory.total} GB`;
+                const memCached = d.memory.cached ? ` · ${d.memory.cached}MB cached` : '';
+                const memAvail = d.memory.available ? `(${d.memory.available}MB avail)` : '';
+                document.getElementById('mem-detail').textContent = `${d.memory.used} / ${d.memory.total} GB${memCached}${memAvail}`;
                 document.getElementById('mem-bar').style.width = d.memory.percent + '%';
                 document.getElementById('mem-bar').className = `h-full rounded-full transition-all duration-500 ${d.memory.percent > 80 ? 'bg-red-400' : 'bg-emerald-400'}`;
 
-                document.getElementById('disk-val').textContent = d.disk.percent + '%';
-                document.getElementById('disk-detail').textContent = `${d.disk.used} / ${d.disk.total} GB`;
-                document.getElementById('disk-bar').style.width = d.disk.percent + '%';
-                document.getElementById('disk-bar').className = `h-full rounded-full transition-all duration-500 ${d.disk.percent > 80 ? 'bg-red-400' : 'bg-amber-400'}`;
+                // GPU
+                if (d.gpu) {
+                    document.getElementById('gpu-body').classList.remove('hidden');
+                    document.getElementById('gpu-unavailable').classList.add('hidden');
+                    document.getElementById('gpu-name').textContent = d.gpu.name.replace('NVIDIA ', '');
+                    document.getElementById('gpu-util-val').textContent = d.gpu.utilization + '%';
+                    const gpuMemPct = Math.round(d.gpu.memory_used / d.gpu.memory_total * 100);
+                    document.getElementById('gpu-mem-detail').textContent = `${Math.round(d.gpu.memory_used)} / ${Math.round(d.gpu.memory_total)} MiB · ${d.gpu.temperature}°C`;
+                    document.getElementById('gpu-mem-bar').style.width = gpuMemPct + '%';
+                    document.getElementById('gpu-mem-bar').className = `h-full rounded-full transition-all duration-500 ${gpuMemPct > 80 ? 'bg-red-400' : 'bg-purple-400'}`;
+                } else {
+                    document.getElementById('gpu-body').classList.add('hidden');
+                    document.getElementById('gpu-unavailable').classList.remove('hidden');
+                }
+
+                // Disk IO
+                document.getElementById('dio-read').textContent = d.disk_io.disk_read_rate + ' MB/s';
+                document.getElementById('dio-write').textContent = d.disk_io.disk_write_rate + ' MB/s';
+
+                // Net IO
+                document.getElementById('nio-sent').textContent = d.net_io.net_sent_rate + ' MB/s';
+                document.getElementById('nio-recv').textContent = d.net_io.net_recv_rate + ' MB/s';
+
+                // Load
+                document.getElementById('load-1').textContent = d.load_avg[0];
+                document.getElementById('load-5').textContent = d.load_avg[1];
+                document.getElementById('load-15').textContent = d.load_avg[2];
+
+                // Top processes — list style
+                if (d.top_processes && d.top_processes.length > 0) {
+                    renderProcesses(d.top_processes);
+                }
 
                 document.getElementById('uptime').textContent = 'up ' + d.uptime;
             } catch {}
         }
 
-        let currentRange = 24;
-        let currentEvents = [];
-
-        // Sparkline
-        function renderSparkline(svgId, data, events, color, warnColor) {
-            const svg = document.getElementById(svgId);
-            if (!svg || data.length < 2) {
-                if (svg) svg.innerHTML = '';
+        // ===== Top Processes: list rendering =====
+        function renderProcesses(procs) {
+            const el = document.getElementById('top-processes');
+            const btn = document.getElementById('proc-expand-btn');
+            if (!procs || procs.length === 0) {
+                el.innerHTML = '<span class="text-slate-300">暂无数据</span>';
+                btn.classList.add('hidden');
                 return;
             }
+            const display = showAllProc ? procs : procs.slice(0, 5);
+            let html = '<div class="space-y-0">';
+            // Header — 7 columns
+            html += `<div class="flex items-center gap-2 pb-1.5 mb-1.5 border-b border-slate-200">
+                <span class="proc-header w-12">PID</span>
+                <span class="proc-header flex-1">进程</span>
+                <span class="proc-header w-10 text-right">CPU%</span>
+                <span class="proc-header w-14 text-right">Mem MB</span>
+                <span class="proc-header w-10 text-right">Mem%</span>
+                <span class="proc-header w-10 text-right">线程</span>
+                <span class="proc-header w-12 text-right">运行时长</span>
+            </div>`;
+            for (const p of display) {
+                const statusColor = p.status === 'running' ? 'text-emerald-500' :
+                                  p.status === 'sleeping' ? 'text-slate-400' : 'text-amber-500';
+                html += `<div class="flex items-center gap-2 py-1 hover:bg-slate-50 rounded text-[12px]">
+                    <span class="w-12 text-slate-400 font-mono">${p.pid}</span>
+                    <span class="flex-1 truncate text-slate-700">${p.name}</span>
+                    <span class="w-10 text-right ${p.cpu > 5 ? 'text-red-500 font-semibold' : 'text-slate-600'}">${p.cpu}</span>
+                    <span class="w-14 text-right text-slate-500">${p.mem_mb}</span>
+                    <span class="w-10 text-right text-slate-500">${p.mem_pct}</span>
+                    <span class="w-10 text-right text-slate-400">${p.threads || '-'}</span>
+                    <span class="w-12 text-right text-slate-400" title="${p.status}"><span class="${statusColor}">●</span> ${p.runtime || '-'}</span>
+                </div>`;
+            }
+            html += '</div>';
+            el.innerHTML = html;
+
+            // Expand button: toggle 5 / 20
+            if (procs.length > 5) {
+                btn.classList.remove('hidden');
+                btn.textContent = showAllProc ? '收起' : `展开全部 (${procs.length})`;
+            } else {
+                btn.classList.add('hidden');
+            }
+        }
+
+        function toggleProcesses() {
+            showAllProc = !showAllProc;
+            if (lastMetrics && lastMetrics.top_processes) {
+                renderProcesses(lastMetrics.top_processes);
+            }
+        }
+
+        // ===== History / Sparkline =====
+        function renderSparkline(svgId, data, events, color, warnColor) {
+            const svg = document.getElementById(svgId);
+            if (!svg || data.length < 2) { if (svg) svg.innerHTML = ''; return; }
             const W = 200, H = 28, PAD = 2;
             const vals = data.map(d => d.value);
             const tsList = data.map(d => d.timestamp);
@@ -270,25 +542,17 @@
                 const y = H - PAD - (v / maxV) * (H - 2 * PAD);
                 return { x, y };
             });
-
             const lastVal = vals[vals.length - 1];
             const strokeColor = lastVal > 80 ? warnColor : color;
-            const fillColor = lastVal > 80 ? warnColor : color;
             const ptsStr = points.map(p => `${p.x},${p.y}`).join(' ');
             const areaPath = `M${ptsStr} L${points[points.length-1].x},${H} L${points[0].x},${H} Z`;
-
-            let html = `
-                <defs>
-                    <linearGradient id="grad-${svgId}" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stop-color="${fillColor}" stop-opacity="0.15"/>
-                        <stop offset="100%" stop-color="${fillColor}" stop-opacity="0"/>
-                    </linearGradient>
-                </defs>
-                <path d="${areaPath}" fill="url(#grad-${svgId})"/>
-                <polyline points="${ptsStr}" fill="none" stroke="${strokeColor}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                <circle cx="${points[points.length-1].x}" cy="${points[points.length-1].y}" r="2" fill="${strokeColor}"/>`;
-
-            // Event markers
+            let html = `<defs><linearGradient id="grad-${svgId}" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="${strokeColor}" stop-opacity="0.15"/>
+                <stop offset="100%" stop-color="${strokeColor}" stop-opacity="0"/>
+            </linearGradient></defs>
+            <path d="${areaPath}" fill="url(#grad-${svgId})"/>
+            <polyline points="${ptsStr}" fill="none" stroke="${strokeColor}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="${points[points.length-1].x}" cy="${points[points.length-1].y}" r="2" fill="${strokeColor}"/>`;
             if (events && events.length > 0) {
                 const firstTs = new Date(tsList[0]).getTime();
                 const lastTs = new Date(tsList[tsList.length - 1]).getTime();
@@ -297,25 +561,62 @@
                     const eTs = new Date(e.timestamp).getTime();
                     if (eTs < firstTs || eTs > lastTs) return;
                     const x = PAD + ((eTs - firstTs) / range) * (W - 2 * PAD);
-                    const isBoot = e.event_type === 'boot';
-                    const lineColor = isBoot ? '#34d399' : '#cbd5e1';
-                    html += `<line x1="${x}" y1="${PAD}" x2="${x}" y2="${H-PAD}" stroke="${lineColor}" stroke-width="1" stroke-dasharray="2,2" opacity="0.7"/>`;
-                    // Small triangle marker at top
-                    if (isBoot) {
-                        html += `<polygon points="${x-2.5},${PAD} ${x+2.5},${PAD} ${x},${PAD+3}" fill="#34d399" opacity="0.8"/>`;
-                    } else {
-                        html += `<polygon points="${x-2.5},${PAD+3} ${x+2.5},${PAD+3} ${x},${PAD}" fill="#cbd5e1" opacity="0.8"/>`;
-                    }
+                    const lc = e.event_type === 'boot' ? '#34d399' : '#cbd5e1';
+                    html += `<line x1="${x}" y1="${PAD}" x2="${x}" y2="${H-PAD}" stroke="${lc}" stroke-width="1" stroke-dasharray="2,2" opacity="0.7"/>`;
                 });
             }
             svg.innerHTML = html;
         }
 
+        function renderBigChart(svgId, data, color) {
+            const svg = document.getElementById(svgId);
+            if (!svg || data.length < 2) { if (svg) svg.innerHTML = ''; return; }
+            const W = 672, H = 220, PAD = 40;
+            const vals = data.map(d => d.value);
+            const tsList = data.map(d => new Date(d.timestamp).getTime());
+            const maxV = Math.max(...vals, 1);
+            const minV = Math.min(...vals, 0);
+            const vRange = maxV - minV || 1;
+            const xRange = tsList[tsList.length - 1] - tsList[0] || 1;
+
+            const points = vals.map((v, i) => ({
+                x: PAD + ((tsList[i] - tsList[0]) / xRange) * (W - 2 * PAD),
+                y: PAD + (1 - (v - minV) / vRange) * (H - 2 * PAD)
+            }));
+            const ptsStr = points.map(p => `${p.x},${p.y}`).join(' ');
+            const areaPath = `M${ptsStr} L${points[points.length-1].x},${H-PAD} L${points[0].x},${H-PAD} Z`;
+
+            // Y-axis labels
+            let labels = '';
+            for (let i = 0; i <= 4; i++) {
+                const y = PAD + (i / 4) * (H - 2 * PAD);
+                const v = maxV - (i / 4) * vRange;
+                labels += `<text x="${PAD - 6}" y="${y + 3}" text-anchor="end" font-size="10" fill="#94a3b8">${Math.round(v)}</text>`;
+                labels += `<line x1="${PAD}" y1="${y}" x2="${W - PAD}" y2="${y}" stroke="#f1f5f9" stroke-width="1"/>`;
+            }
+            // X-axis time labels
+            const timeSteps = 5;
+            for (let i = 0; i <= timeSteps; i++) {
+                const ts = tsList[0] + (i / timeSteps) * xRange;
+                const x = PAD + (i / timeSteps) * (W - 2 * PAD);
+                const d = new Date(ts);
+                const label = `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+                labels += `<text x="${x}" y="${H - PAD + 16}" text-anchor="middle" font-size="9" fill="#94a3b8">${label}</text>`;
+            }
+
+            svg.innerHTML = `${labels}
+                <defs><linearGradient id="grad-detail" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="${color}" stop-opacity="0.15"/>
+                    <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+                </linearGradient></defs>
+                <path d="${areaPath}" fill="url(#grad-detail)"/>
+                <polyline points="${ptsStr}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="${points[points.length-1].x}" cy="${points[points.length-1].y}" r="4" fill="${color}"/>`;
+        }
+
         function switchRange(hours) {
             currentRange = hours;
-            document.querySelectorAll('.range-btn').forEach(b => {
-                b.classList.toggle('active', parseInt(b.dataset.range) === hours);
-            });
+            document.querySelectorAll('.range-btn').forEach(b => b.classList.toggle('active', parseInt(b.dataset.range) === hours));
             loadHistory();
         }
 
@@ -323,100 +624,329 @@
             try {
                 const res = await fetch(`/api/wsl/metrics/history?hours=${currentRange}`);
                 const resp = await res.json();
-                const data = resp.metrics || [];
+                const data = resp.data || [];
                 currentEvents = resp.events || [];
                 if (data.length === 0) return;
-                renderSparkline('cpu-spark', data.map(d => ({ value: d.cpu_percent, timestamp: d.timestamp })), currentEvents, '#60a5fa', '#f87171');
-                renderSparkline('mem-spark', data.map(d => ({ value: d.mem_percent, timestamp: d.timestamp })), currentEvents, '#34d399', '#f87171');
-                renderSparkline('disk-spark', data.map(d => ({ value: d.disk_percent, timestamp: d.timestamp })), currentEvents, '#fbbf24', '#f87171');
+                // CPU
+                if (resp.metric === 'cpu_percent' || !resp.metric) {
+                    const cpuRes = await fetch(`/api/wsl/metrics/history?hours=${currentRange}&metric=cpu_percent`);
+                    const cpuResp = await cpuRes.json();
+                    renderSparkline('cpu-spark', cpuResp.data || [], currentEvents, '#60a5fa', '#f87171');
+                }
+                // Memory
+                const memRes = await fetch(`/api/wsl/metrics/history?hours=${currentRange}&metric=mem_percent`);
+                const memResp = await memRes.json();
+                renderSparkline('mem-spark', memResp.data || [], currentEvents, '#34d399', '#f87171');
+                // GPU util
+                const gpuRes = await fetch(`/api/wsl/metrics/history?hours=${currentRange}&metric=gpu_util`);
+                const gpuResp = await gpuRes.json();
+                if (gpuResp.data && gpuResp.data.length > 0) renderSparkline('gpu-spark', gpuResp.data, currentEvents, '#a78bfa', '#f87171');
+                else { const svg = document.getElementById('gpu-spark'); if (svg) svg.innerHTML = ''; }
+                // Load
+                const loadRes = await fetch(`/api/wsl/metrics/history?hours=${currentRange}&metric=load1`);
+                const loadResp = await loadRes.json();
+                renderSparkline('load-spark', loadResp.data || [], currentEvents, '#fb7185', '#f87171');
             } catch {}
         }
 
-        // Boot/Shutdown Events
+        // ===== Detail Modal =====
+        const METRIC_CONFIG = {
+            cpu:  { title: 'CPU 使用率',    icon: 'cpu',          field: 'cpu_percent',  color: '#60a5fa', unit: '%' },
+            mem:  { title: 'Memory 使用率',  icon: 'memory-stick',  field: 'mem_percent',  color: '#34d399', unit: '%' },
+            gpu:  { title: 'GPU',            icon: 'gpu',          field: 'gpu_util',     color: '#a78bfa', unit: '%',
+                    subMetrics: [
+                        { key:'gpu_util',     label:'利用率',  unit:'%' },
+                        { key:'gpu_mem_used',  label:'显存',   unit:'MiB' },
+                        { key:'gpu_temp',      label:'温度',   unit:'°C' },
+                        { key:'gpu_power',     label:'功耗',   unit:'W' }
+                    ]},
+            disk_io: { title: 'Disk IO 读取', icon: 'hard-drive',  field: 'disk_read_rate', color: '#fbbf24', unit: ' MB/s' },
+            net_io:  { title: 'Network 下载', icon: 'wifi',         field: 'net_recv_rate', color: '#38bdf8', unit: ' MB/s' },
+            load: { title: 'Load Average',   icon: 'gauge',        field: 'load1',        color: '#fb7185', unit: '' }
+        };
+        let gpuSubKey = 'gpu_util';  // active GPU sub-metric
+
+        async function showDetail(type) {
+            detailType = type;
+            detailHours = 24;
+            const cfg = METRIC_CONFIG[type];
+            const modal = document.getElementById('detail-modal');
+            document.getElementById('detail-title').textContent = cfg.title;
+            document.getElementById('detail-icon').setAttribute('data-lucide', cfg.icon);
+            // Render sub-metric tabs for GPU
+            const subArea = document.getElementById('detail-sub');
+            if (cfg.subMetrics) {
+                gpuSubKey = cfg.subMetrics[0].key;
+                subArea.innerHTML = cfg.subMetrics.map(s =>
+                    `<button onclick="switchGpuSub('${s.key}')" class="gpu-sub-btn ${s.key === gpuSubKey ? 'active' : ''}" data-key="${s.key}">${s.label}</button>`
+                ).join('');
+                subArea.classList.remove('hidden');
+            } else {
+                subArea.classList.add('hidden');
+            }
+            lucide.createIcons();
+            modal.classList.remove('hidden');
+            updateDetailRangeLabel();
+            await updateDetailChart();
+            startDetailRefresh();
+        }
+
+        function switchGpuSub(key) {
+            gpuSubKey = key;
+            document.querySelectorAll('.gpu-sub-btn').forEach(b => b.classList.toggle('active', b.dataset.key === key));
+            updateDetailChart();
+        }
+
+        async function updateDetailChart() {
+            if (!detailType) return;
+            const cfg = METRIC_CONFIG[detailType];
+            // Determine the actual metric field
+            let field = cfg.field;
+            let unit = cfg.unit;
+            if (cfg.subMetrics) {
+                const sub = cfg.subMetrics.find(s => s.key === gpuSubKey);
+                field = sub ? sub.key : cfg.field;
+                unit = sub ? sub.unit : cfg.unit;
+            }
+            try {
+                const res = await fetch(`/api/wsl/metrics/history?hours=${detailHours}&metric=${field}`);
+                const resp = await res.json();
+                const data = resp.data || [];
+                renderBigChart('detail-spark', data, cfg.color);
+                // Stats
+                if (data.length > 0) {
+                    const vals = data.map(d => d.value);
+                    const cur = vals[vals.length - 1];
+                    document.getElementById('detail-current').textContent = cur + unit;
+                    document.getElementById('detail-stat').textContent =
+                        `avg ${Math.round(vals.reduce((a,b) => a+b, 0) / vals.length)} · min ${Math.min(...vals)} · max ${Math.max(...vals)}`;
+                }
+                // Update current value from live data
+                if (lastMetrics) {
+                    const liveVal = getLiveValue(detailType, field);
+                    if (liveVal !== null) {
+                        document.getElementById('detail-current').textContent = liveVal + unit;
+                    }
+                }
+            } catch {}
+        }
+
+        function getLiveValue(type, field) {
+            if (!lastMetrics) return null;
+            switch(type) {
+                case 'cpu': return lastMetrics.cpu_percent;
+                case 'mem': return lastMetrics.memory.percent;
+                case 'gpu':
+                    if (!lastMetrics.gpu) return null;
+                    const g = lastMetrics.gpu;
+                    if (field === 'gpu_mem_used') return Math.round(g.memory_used);
+                    if (field === 'gpu_temp') return g.temperature;
+                    if (field === 'gpu_power') return Math.round(g.power_draw);
+                    return g.utilization;
+                case 'disk_io': return lastMetrics.disk_io.disk_read_rate;
+                case 'net_io': return lastMetrics.net_io.net_recv_rate;
+                case 'load': return lastMetrics.load_avg[0];
+                default: return null;
+            }
+        }
+
+        async function detailTick() {
+            await loadMetrics();
+            await updateDetailChart();
+        }
+
+        function startDetailRefresh() {
+            if (detailInterval) clearInterval(detailInterval);
+            detailInterval = setInterval(detailTick, 30000); // 30s refresh for live value
+        }
+
+        function updateDetailRangeLabel() {
+            const label = DETAIL_HOURS_LABEL[detailHours] || detailHours + 'h';
+            document.getElementById('detail-range-label').textContent = '范围: ' + label;
+        }
+
+        function closeDetail(e) {
+            if (e && e.target !== document.getElementById('detail-modal')) return;
+            if (!e) { /* called directly */ }
+            document.getElementById('detail-modal').classList.add('hidden');
+            if (detailInterval) { clearInterval(detailInterval); detailInterval = null; }
+            detailType = '';
+        }
+
+        // Scroll wheel to zoom time axis
+        document.getElementById('detail-modal').addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const idx = DETAIL_HOURS.indexOf(detailHours);
+            if (e.deltaY < 0 && idx > 0) {
+                // Scroll up → zoom in (shorter time)
+                detailHours = DETAIL_HOURS[idx - 1];
+            } else if (e.deltaY > 0 && idx < DETAIL_HOURS.length - 1) {
+                // Scroll down → zoom out (longer time)
+                detailHours = DETAIL_HOURS[idx + 1];
+            } else return;
+            updateDetailRangeLabel();
+            updateDetailChart();
+        });
+
+        // ===== Network Monitor =====
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            const v = bytes / Math.pow(k, i);
+            return (i === 0 ? v : v.toFixed(1)) + ' ' + sizes[i];
+        }
+
+        async function loadNetData() {
+            try {
+                const [summaryRes, alertRes] = await Promise.all([
+                    fetch('/api/net/summary?hours=24'),
+                    fetch('/api/net/alerts?unacknowledged=1')
+                ]);
+                const summary = await summaryRes.json();
+                const alertData = await alertRes.json();
+
+                renderNetTraffic(summary.traffic || []);
+                renderNetProcesses(summary.top_processes || []);
+                renderNetAlerts(alertData.alerts || []);
+            } catch {}
+        }
+
+        function renderNetTraffic(traffic) {
+            const el = document.getElementById('net-traffic-content');
+            if (!traffic || traffic.length === 0) {
+                el.innerHTML = '<span class="text-xs text-slate-300">暂无数据</span>';
+                return;
+            }
+            let html = '';
+            for (const iface of traffic) {
+                if (iface.rx === 0 && iface.tx === 0) continue;
+                const total = (iface.rx || 0) + (iface.tx || 0);
+                const name = iface.interface === 'eth1' ? 'WSL 主网卡' :
+                           iface.interface === 'tailscale0' ? 'Tailscale' : iface.interface;
+                html += `<div class="flex items-center justify-between py-1">
+                    <span class="text-slate-600">${name}</span>
+                    <span class="text-slate-400">${formatBytes(total)}</span>
+                </div>
+                <div class="flex items-center gap-3 mb-2">
+                    <span class="text-[10px] text-sky-400">↓ ${formatBytes(iface.rx || 0)}</span>
+                    <span class="text-[10px] text-emerald-400">↑ ${formatBytes(iface.tx || 0)}</span>
+                </div>`;
+            }
+            el.innerHTML = html || '<span class="text-xs text-slate-300">暂无流量数据</span>';
+        }
+
+        function renderNetProcesses(procs) {
+            const el = document.getElementById('net-processes');
+            if (!procs || procs.length === 0) {
+                el.innerHTML = '<span class="text-xs text-slate-300">暂无数据</span>';
+                return;
+            }
+            const display = procs.slice(0, 5);
+            let html = '<div class="space-y-0">';
+            html += `<div class="flex items-center gap-2 pb-1.5 mb-1 border-b border-slate-200 proc-header">
+                <span class="flex-1">进程</span>
+                <span class="w-14 text-right">上传</span>
+                <span class="w-14 text-right">下载</span>
+            </div>`;
+            for (const p of display) {
+                const name = p.process_name.split('/').pop() || p.process_name;
+                html += `<div class="flex items-center gap-2 py-0.5 text-[11px]">
+                    <span class="flex-1 truncate text-slate-700">${name}</span>
+                    <span class="w-14 text-right text-sky-500">${formatBytes(p.sent || 0)}</span>
+                    <span class="w-14 text-right text-emerald-500">${formatBytes(p.recv || 0)}</span>
+                </div>`;
+            }
+            html += '</div>';
+            el.innerHTML = html;
+        }
+
+        function renderNetAlerts(alerts) {
+            const area = document.getElementById('net-alerts-area');
+            const el = document.getElementById('net-alerts');
+            const badge = document.getElementById('net-alert-count');
+
+            if (!alerts || alerts.length === 0) {
+                area.classList.add('hidden');
+                return;
+            }
+
+            area.classList.remove('hidden');
+            badge.textContent = alerts.length;
+            badge.classList.remove('hidden');
+
+            const display = alerts.slice(0, 3);
+            el.innerHTML = display.map(a => {
+                const icon = a.severity === 'warning' ? '<span class="text-amber-500">⚠</span>' :
+                           a.severity === 'danger' ? '<span class="text-red-500">🔴</span>' :
+                           '<span class="text-blue-400">ℹ</span>';
+                return `<div class="flex items-center gap-2 py-0.5">
+                    ${icon}
+                    <span class="text-slate-600 truncate">${a.detail || a.alert_type}
+                        <span class="text-slate-300 ml-1">${new Date(a.timestamp).toLocaleString('zh-CN', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}</span>
+                    </span>
+                    <button onclick="ackAlert(${a.id})" class="ml-auto text-[10px] text-slate-300 hover:text-slate-500">忽略</button>
+                </div>`;
+            }).join('');
+        }
+
+        async function ackAlert(id) {
+            try {
+                await fetch(`/api/net/alerts/${id}/ack`, { method: 'POST' });
+                loadNetData();
+            } catch {}
+        }
+
+        // ===== Events =====
         async function loadEvents() {
             try {
                 const res = await fetch('/api/wsl/events?limit=10');
                 const events = await res.json();
                 const el = document.getElementById('events-list');
-                if (events.length === 0) {
-                    el.innerHTML = '<span class="text-slate-300">暂无记录</span>';
-                    return;
-                }
+                if (events.length === 0) { el.innerHTML = '<span class="text-slate-300">暂无记录</span>'; return; }
                 el.innerHTML = events.map(e => {
                     const isBoot = e.event_type === 'boot';
-                    const icon = isBoot ? '▲' : '▼';
-                    const color = isBoot ? 'text-emerald-400' : 'text-slate-400';
-                    const label = isBoot ? '开机' : '关机';
-                    const time = new Date(e.timestamp).toLocaleString('zh-CN', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
-                    return `<div class="flex items-center gap-2"><span class="${color}">${icon}</span><span class="text-slate-500">${label}</span><span class="text-slate-300 ml-auto">${time}</span></div>`;
+                    return `<div class="flex items-center gap-2">
+                        <span class="${isBoot ? 'text-emerald-400' : 'text-slate-400'}">${isBoot ? '▲' : '▼'}</span>
+                        <span class="text-slate-500">${isBoot ? '开机' : '关机'}</span>
+                        <span class="text-slate-300 ml-auto">${new Date(e.timestamp).toLocaleString('zh-CN', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' })}</span>
+                    </div>`;
                 }).join('');
             } catch {}
         }
 
-        // Status
+        // ===== Status =====
         async function checkAllStatus() {
-            const promises = systems.map(async s => {
+            await Promise.all(systems.map(async s => {
                 try {
                     const res = await fetch(`/api/systems/${s.id}/status`);
                     const data = await res.json();
                     s.online = data.online;
                     const dot = document.getElementById(`status-${s.id}`);
-                    if (dot) {
-                        dot.className = `status-dot ${data.online ? 'status-online' : 'status-offline'}`;
-                        dot.title = data.online ? '在线' : '离线';
-                    }
+                    if (dot) { dot.className = `status-dot ${data.online ? 'status-online' : 'status-offline'}`; dot.title = data.online ? '在线' : '离线'; }
                 } catch { s.online = false; }
-            });
-            await Promise.all(promises);
+            }));
             updateCounts();
         }
 
-        function updateCounts() {
-            const online = systems.filter(s => s.online).length;
-            document.getElementById('online-count').textContent = online;
-            document.getElementById('total-count').textContent = systems.length;
-        }
-
-        // Drag & Drop
-        function handleDragStart(e) {
-            draggedItem = e.target.closest('.card');
-            draggedItem.classList.add('dragging');
-            e.dataTransfer.effectAllowed = 'move';
-        }
-
-        function handleDragEnd(e) {
-            if (draggedItem) draggedItem.classList.remove('dragging');
-            document.querySelectorAll('.card').forEach(c => c.classList.remove('drag-over'));
-            draggedItem = null;
-        }
-
-        function handleDragOver(e) {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-            const card = e.target.closest('.card');
-            document.querySelectorAll('.card').forEach(c => c.classList.remove('drag-over'));
-            if (card && card !== draggedItem) card.classList.add('drag-over');
-        }
-
+        // ===== Drag & Drop =====
+        function handleDragStart(e) { draggedItem = e.target.closest('.card'); draggedItem.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; }
+        function handleDragEnd(e) { if (draggedItem) draggedItem.classList.remove('dragging'); document.querySelectorAll('.card').forEach(c => c.classList.remove('drag-over')); draggedItem = null; }
+        function handleDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; const card = e.target.closest('.card'); document.querySelectorAll('.card').forEach(c => c.classList.remove('drag-over')); if (card && card !== draggedItem) card.classList.add('drag-over'); }
         async function handleDrop(e) {
             e.preventDefault();
             document.querySelectorAll('.card').forEach(c => c.classList.remove('drag-over'));
             const target = e.target.closest('.card');
             if (!target || !draggedItem || target === draggedItem) return;
-
             const fromId = parseInt(draggedItem.dataset.id);
             const toId = parseInt(target.dataset.id);
             const fromIndex = systems.findIndex(s => s.id === fromId);
             const toIndex = systems.findIndex(s => s.id === toId);
             const [moved] = systems.splice(fromIndex, 1);
             systems.splice(toIndex, 0, moved);
-
             const orders = systems.map((s, i) => ({ id: s.id, sort_order: i }));
-            await fetch('/api/systems/reorder', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ orders })
-            });
+            await fetch('/api/systems/reorder', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orders }) });
             renderSystems();
         }
     </script>

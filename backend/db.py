@@ -47,8 +47,23 @@ def migrate_db():
             timestamp TEXT NOT NULL,
             cpu_percent REAL,
             mem_used REAL, mem_total REAL, mem_percent REAL,
-            disk_used REAL, disk_total REAL, disk_percent REAL)''')
+            disk_used REAL, disk_total REAL, disk_percent REAL,
+            gpu_util REAL, gpu_mem_used REAL, gpu_temp REAL, gpu_power REAL,
+            disk_read_rate REAL, disk_write_rate REAL,
+            net_sent_rate REAL, net_recv_rate REAL,
+            load1 REAL, load5 REAL, load15 REAL)''')
         c.execute('CREATE INDEX idx_wsl_metrics_ts ON wsl_metrics(timestamp)')
+    else:
+        # Migrate: add new columns for v0.5 monitoring
+        c.execute("PRAGMA table_info(wsl_metrics)")
+        existing = [col[1] for col in c.fetchall()]
+        for field, dtype in [('gpu_util', 'REAL'), ('gpu_mem_used', 'REAL'),
+                             ('gpu_temp', 'REAL'), ('gpu_power', 'REAL'),
+                             ('disk_read_rate', 'REAL'), ('disk_write_rate', 'REAL'),
+                             ('net_sent_rate', 'REAL'), ('net_recv_rate', 'REAL'),
+                             ('load1', 'REAL'), ('load5', 'REAL'), ('load15', 'REAL')]:
+            if field not in existing:
+                c.execute(f'ALTER TABLE wsl_metrics ADD COLUMN {field} {dtype}')
 
     # wsl_events table
     c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='wsl_events'")
@@ -76,6 +91,58 @@ def migrate_db():
             backup_file TEXT NOT NULL, backup_path TEXT NOT NULL,
             file_size INTEGER, backup_type TEXT DEFAULT 'manual',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+
+    # net_traffic table (from vnstat, hourly aggregates)
+    c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='net_traffic'")
+    if not c.fetchone():
+        c.execute('''CREATE TABLE net_traffic (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            interface TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            rx_bytes INTEGER DEFAULT 0,
+            tx_bytes INTEGER DEFAULT 0)''')
+        c.execute('CREATE INDEX idx_net_traffic_ts ON net_traffic(timestamp)')
+        c.execute('CREATE INDEX idx_net_traffic_iface ON net_traffic(interface)')
+
+    # net_process table (from nethogs, per-process traffic samples)
+    c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='net_process'")
+    if not c.fetchone():
+        c.execute('''CREATE TABLE net_process (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            pid INTEGER,
+            process_name TEXT NOT NULL,
+            sent_bytes INTEGER DEFAULT 0,
+            recv_bytes INTEGER DEFAULT 0)''')
+        c.execute('CREATE INDEX idx_net_process_ts ON net_process(timestamp)')
+        c.execute('CREATE INDEX idx_net_process_name ON net_process(process_name)')
+
+    # net_conn table (from ss, connection snapshots)
+    c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='net_conn'")
+    if not c.fetchone():
+        c.execute('''CREATE TABLE net_conn (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            local_ip TEXT, local_port INTEGER,
+            remote_ip TEXT NOT NULL, remote_port INTEGER,
+            proto TEXT, pid INTEGER,
+            process_name TEXT)''')
+        c.execute('CREATE INDEX idx_net_conn_ts ON net_conn(timestamp)')
+        c.execute('CREATE INDEX idx_net_conn_rip ON net_conn(remote_ip)')
+
+    # net_alert table (anomaly alerts)
+    c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='net_alert'")
+    if not c.fetchone():
+        c.execute('''CREATE TABLE net_alert (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            alert_type TEXT NOT NULL,
+            severity TEXT DEFAULT "info",
+            remote_ip TEXT, port INTEGER,
+            process_name TEXT,
+            detail TEXT,
+            acknowledged INTEGER DEFAULT 0)''')
+        c.execute('CREATE INDEX idx_net_alert_ts ON net_alert(timestamp)')
 
     conn.commit()
     conn.close()

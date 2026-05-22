@@ -244,23 +244,7 @@
 
 ---
 
-## v0.6 - Dashboard MCP Server 🤖
-
-**目标**：让 Hermes 能调用 Dashboard 的能力
-
-- [ ] 将 Dashboard 封装为 MCP Server
-- [ ] 暴露工具：
-  - `list_services` - 列出所有服务
-  - `check_service_status` - 检测指定服务状态
-  - `restart_service` - 重启服务
-  - `get_wsl_metrics` - 获取 WSL 性能数据（含 GPU）
-  - `get_service_logs` - 获取服务日志
-- [ ] 在 Hermes 中配置 Dashboard MCP
-- [ ] 测试：QQ 发消息 → Hermes → Dashboard MCP → 返回结果
-
----
-
-## v0.7 - AI 告警通知 🔔
+## v0.6 - AI 告警通知 🔔
 
 **目标**：服务异常自动通过 QQ 推送
 
@@ -293,7 +277,27 @@
 
 ---
 
-## v0.8 - 正式版 🎉
+## v0.8 - Dashboard MCP Server 🤖
+
+**目标**：标准化暴露 Dashboard 能力，跨平台复用（Hermes / Claude / IDE 通用）
+
+> 当前 Hermes 已可通过 REST API 调用，MCP 提供标准化 schema 和自动工具发现，换 AI 平台时无需重新对接。
+
+- [ ] 将 Dashboard 封装为 MCP Server
+- [ ] 暴露工具：
+  - [ ] `list_services` - 列出所有服务
+  - [ ] `check_service_status` - 检测指定服务状态
+  - [ ] `restart_service` - 重启服务
+  - [ ] `get_wsl_metrics` - 获取 WSL 性能数据（含 GPU）
+  - [ ] `get_service_logs` - 获取服务日志
+  - [ ] `get_net_alerts` - 获取网络异常告警
+  - [ ] `get_net_traffic` - 获取流量统计
+- [ ] 在 Hermes 中配置 Dashboard MCP
+- [ ] 测试：QQ 发消息 → Hermes → Dashboard MCP → 返回结果
+
+---
+
+## v0.9 - 正式版 🎉
 
 **目标**：功能完整，稳定运行
 

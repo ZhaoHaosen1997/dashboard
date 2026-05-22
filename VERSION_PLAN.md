@@ -145,7 +145,7 @@
   - [x] GPU 功耗（如有）
 - [x] 磁盘 I/O
   - [x] 读写速率（MB/s）
-  - [ ] IOPS（可选）
+  - [x] IOPS（可选）
 - [x] 网络 I/O
   - [x] 上传/下载速率（MB/s）
   - [x] 总发送/接收字节数（见 v0.5.2）
@@ -229,6 +229,18 @@
 - nethogs 进程名显示完整路径（如 `/home/zhaohaosen/.hermes/hermes-agent/venv/bin/python`），待优化为 basename
 - 首次运行 24h 内所有 IP 都是"新 IP"，告警量较大（正常现象，随时间推移减少）
 - WSL2 环境下 nethogs 只能看到 WSL 内部的网络流量
+
+---
+
+## v0.5.3 - IP 告警白名单 🔜
+
+**目标**：减少告警噪音，局域网/Tailscale 等可信 IP 段自动忽略
+
+- [ ] 数据库新增 `net_whitelist` 表（cidr / 备注）
+- [ ] 管理后台添加白名单配置页面
+- [ ] 采集器 `_detect_new_ips` 加入白名单检查
+- [ ] 预置默认白名单：`192.163.20.0/24`（局域网）、`100.64.0.0/10`（Tailscale）、`127.0.0.0/8`（本地）
+- [ ] API: `GET/POST/DELETE /api/net/whitelist`
 
 ---
 

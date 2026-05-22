@@ -298,7 +298,8 @@
                 <div class="flex items-center gap-2 mb-3">
                     <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-400"></i>
                     <span class="text-xs text-slate-400">异常告警</span>
-                    <span id="net-alert-count" class="ml-auto text-[10px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-full hidden"></span>
+                    <span id="net-alert-count" class="text-[10px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-full hidden"></span>
+                    <button id="alert-expand-btn" onclick="toggleAlerts()" class="ml-auto text-xs text-blue-500 hover:text-blue-700 hidden">展开全部</button>
                 </div>
                 <div id="net-alerts" class="space-y-1 text-xs text-slate-500"></div>
             </div>
@@ -341,6 +342,7 @@
         let currentEvents = [];
         let lastMetrics = null;
         let showAllProc = false;
+        let showAllAlerts = false;
 
         // Detail modal state
         let detailInterval = null;
@@ -876,7 +878,15 @@
             badge.textContent = alerts.length;
             badge.classList.remove('hidden');
 
-            const display = alerts.slice(0, 3);
+            const btn = document.getElementById('alert-expand-btn');
+            if (alerts.length > 3) {
+                btn.classList.remove('hidden');
+                btn.textContent = showAllAlerts ? '收起' : `展开全部 (${alerts.length})`;
+            } else {
+                btn.classList.add('hidden');
+            }
+
+            const display = showAllAlerts ? alerts : alerts.slice(0, 3);
             el.innerHTML = display.map(a => {
                 const icon = a.severity === 'warning' ? '<span class="text-amber-500">⚠</span>' :
                            a.severity === 'danger' ? '<span class="text-red-500">🔴</span>' :
@@ -896,6 +906,11 @@
                 await fetch(`/api/net/alerts/${id}/ack`, { method: 'POST' });
                 loadNetData();
             } catch {}
+        }
+
+        function toggleAlerts() {
+            showAllAlerts = !showAllAlerts;
+            loadNetData();
         }
 
         // ===== Events =====

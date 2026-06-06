@@ -160,6 +160,17 @@ def migrate_db():
         ]
         c.executemany('INSERT INTO net_whitelist (cidr, note) VALUES (?,?)', defaults)
 
+    # gpu_lock_log table (lock/unlock event history)
+    c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='gpu_lock_log'")
+    if not c.fetchone():
+        c.execute('''CREATE TABLE gpu_lock_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            action TEXT NOT NULL,
+            who TEXT DEFAULT '',
+            source TEXT DEFAULT 'manual')''')
+        c.execute('CREATE INDEX idx_gpu_log_ts ON gpu_lock_log(timestamp)')
+
     conn.commit()
     conn.close()
 

@@ -1,8 +1,12 @@
 """GPU lock management routes + auto lock/unlock background thread."""
+import sqlite3
 import subprocess
 import threading
 import time
+from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify
+
+from db import DB_PATH
 
 gpu_bp = Blueprint('gpu', __name__)
 
@@ -64,6 +68,37 @@ def _get_gpu_util():
         return None
 
 
+def _log_event(action, who, source='manual'):
+    """Record a lock/unlock event in gpu_lock_log."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.execute(
+            'INSERT INTO gpu_lock_log (timestamp, action, who, source) VALUES (?,?,?,?)',
+            (datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'), action, who, source)
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
+def _get_logs(limit=10):
+    """Fetch recent lock/unlock events."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            'SELECT * FROM gpu_lock_log ORDER BY timestamp DESC LIMIT ?', (limit,)
+        ).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception:
+        return []
+
+
+_lock_thread_started = False
+
+
 # ── API routes ────────────────────────────────────────────────────
 
 @gpu_bp.route('/api/gpu/lock', methods=['GET'])
@@ -83,15 +118,21 @@ def acquire_lock():
     out, rc = _run_script('lock', who)
     if rc == -1:
         return jsonify({'ok': False, 'message': 'GPU lock script not available'}), 500
+    _log_event('lock', who, 'manual')
     return jsonify({'ok': True, 'message': out})
 
 
 @gpu_bp.route('/api/gpu/lock', methods=['DELETE'])
 def release_lock():
     """解锁"""
+    # Get who currently holds the lock for logging
+    status_out, _ = _run_script('status')
+    info = _parse_status(status_out)
+    who = info.get('who', 'unknown')
     out, rc = _run_script('unlock')
     if rc == -1:
         return jsonify({'ok': False, 'message': 'GPU lock script not available'}), 500
+    _log_event('unlock', who, 'manual')
     return jsonify({'ok': True, 'message': out})
 
 
@@ -131,6 +172,13 @@ def update_auto_config():
     return jsonify({'ok': True, 'config': _auto_state})
 
 
+@gpu_bp.route('/api/gpu/lock/log')
+def get_lock_log():
+    """获取最近加锁/解锁记录"""
+    limit = request.args.get('limit', 10, type=int)
+    return jsonify(_get_logs(limit))
+
+
 # ── Auto lock/unlock thread ────────────────────────────────────────
 
 def _auto_lock_loop():
@@ -164,6 +212,7 @@ def _auto_lock_loop():
             elif now - _auto_state['idle_since'] >= _auto_state['idle_duration']:
                 # Idle long enough — auto lock
                 _run_script('lock', 'auto-idle')
+                _log_event('lock', 'auto-idle', 'auto')
                 _auto_state['idle_since'] = None
         elif not locked and not is_idle:
             # GPU is busy and unlocked — reset tracking
@@ -184,6 +233,7 @@ def _auto_lock_loop():
                     elif now - _auto_state['busy_since'] >= _auto_state['busy_duration']:
                         # Busy long enough — auto unlock (someone needs it)
                         _run_script('unlock')
+                        _log_event('unlock', 'auto-idle', 'auto')
                         _auto_state['busy_since'] = None
 
             _auto_state['idle_since'] = None
@@ -191,5 +241,9 @@ def _auto_lock_loop():
 
 def start_gpu_auto_lock():
     """Start the auto lock/unlock background thread."""
+    global _lock_thread_started
+    if _lock_thread_started:
+        return
+    _lock_thread_started = True
     t = threading.Thread(target=_auto_lock_loop, daemon=True, name='gpu-auto-lock')
     t.start()

@@ -232,15 +232,15 @@
 
 ---
 
-## v0.5.3 - IP 告警白名单 🔜
+## v0.5.3 - IP 告警白名单 ✅
 
 **目标**：减少告警噪音，局域网/Tailscale 等可信 IP 段自动忽略
 
-- [ ] 数据库新增 `net_whitelist` 表（cidr / 备注）
-- [ ] 管理后台添加白名单配置页面
-- [ ] 采集器 `_detect_new_ips` 加入白名单检查
-- [ ] 预置默认白名单：`192.163.20.0/24`（局域网）、`100.64.0.0/10`（Tailscale）、`127.0.0.0/8`（本地）
-- [ ] API: `GET/POST/DELETE /api/net/whitelist`
+- [x] 数据库新增 `net_whitelist` 表（cidr / 备注）
+- [x] 管理后台添加白名单配置页面
+- [x] 采集器 `_detect_new_ips` 加入白名单检查
+- [x] 预置默认白名单：`192.163.20.0/24`（局域网）、`100.64.0.0/10`（Tailscale）、`127.0.0.0/8`（本地）
+- [x] API: `GET/POST/DELETE /api/net/whitelist`
 
 ---
 

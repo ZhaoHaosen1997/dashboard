@@ -161,6 +161,13 @@
                             <div id="gpu-mem-bar" class="h-full bg-purple-400 rounded-full transition-all duration-500" style="width:0%"></div>
                         </div>
                         <svg class="sparkline mt-2" id="gpu-spark"></svg>
+                        <div id="gpu-lock-bar" class="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between hidden">
+                            <span class="text-[11px] text-slate-500 flex items-center gap-1">
+                                <span id="gpu-lock-icon"></span>
+                                <span id="gpu-lock-text"></span>
+                            </span>
+                            <button id="gpu-lock-btn" onclick="toggleGpuLock(event)" class="text-[10px] px-2 py-0.5 rounded transition-colors"></button>
+                        </div>
                     </div>
                     <div id="gpu-unavailable" class="hidden text-xs text-slate-300 mt-4">N/A</div>
                 </div>
@@ -358,6 +365,7 @@
             loadHistory();
             loadEvents();
             loadNetData();
+            loadGpuLock();
             setInterval(loadMetrics, 30000);
             setInterval(loadHistory, 300000);
             setInterval(loadEvents, 60000);
@@ -475,6 +483,48 @@
                 }
 
                 document.getElementById('uptime').textContent = 'up ' + d.uptime;
+                loadGpuLock();
+            } catch {}
+        }
+
+        // ===== GPU Lock =====
+        async function loadGpuLock() {
+            try {
+                const res = await fetch('/api/gpu/lock');
+                const d = await res.json();
+                const bar = document.getElementById('gpu-lock-bar');
+                if (!d || d.note) { bar.classList.add('hidden'); return; }
+
+                bar.classList.remove('hidden');
+                const icon = document.getElementById('gpu-lock-icon');
+                const text = document.getElementById('gpu-lock-text');
+                const btn = document.getElementById('gpu-lock-btn');
+
+                if (d.locked) {
+                    icon.textContent = '🔒';
+                    text.textContent = `已锁定 · ${d.who || 'unknown'}`;
+                    btn.textContent = '解锁';
+                    btn.className = 'text-[10px] px-2 py-0.5 rounded transition-colors bg-red-50 text-red-500 hover:bg-red-100';
+                } else {
+                    icon.textContent = '🔓';
+                    text.textContent = '空闲';
+                    btn.textContent = '锁定';
+                    btn.className = 'text-[10px] px-2 py-0.5 rounded transition-colors bg-emerald-50 text-emerald-500 hover:bg-emerald-100';
+                }
+            } catch {}
+        }
+
+        async function toggleGpuLock(e) {
+            e.stopPropagation();
+            try {
+                const res = await fetch('/api/gpu/lock');
+                const d = await res.json();
+                if (d.locked) {
+                    await fetch('/api/gpu/lock', { method: 'DELETE' });
+                } else {
+                    await fetch('/api/gpu/lock', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({who:'dashboard'}) });
+                }
+                loadGpuLock();
             } catch {}
         }
 

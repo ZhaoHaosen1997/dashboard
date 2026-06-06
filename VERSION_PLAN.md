@@ -244,6 +244,37 @@
 
 ---
 
+## v0.5.4 - GPU 锁管理 ✅
+
+**目标**：通过 HTTP API 管理 GPU 使用锁，附带自动加锁/解锁的定时检查
+
+### GPU 锁 API（调用 `gpu_lock.sh`）
+- [x] `GET /api/gpu/lock` — 查看锁状态（locked / who）
+- [x] `PUT /api/gpu/lock` — 加锁 `{"who":"comfyui"}`
+- [x] `DELETE /api/gpu/lock` — 解锁
+- [x] `GET /api/gpu/lock/check` — 快速检测（200空闲 / 409占用）
+- [x] Windows 开发环境兜底：脚本不存在时返回 `{"locked":false, "note":"..."}`
+
+### 自动加锁/解锁
+- [x] 后台线程每 15s 检查 GPU 利用率（nvidia-smi）
+- [x] 配置化：空闲阈值 5%、空闲锁定时长 60s、繁忙解锁时长 30s
+- [x] 空闲超时 → 自动加锁（who=`auto-idle`）
+- [x] 自动锁期间 GPU 恢复繁忙 → 自动解锁
+- [x] `GET/PUT /api/gpu/lock/auto` — 查看/修改自动配置
+
+### 前端
+- [x] GPU 卡片底部新增锁状态指示条（🔒已锁定 / 🔓空闲）
+- [x] 点击按钮一键加锁/解锁（who=`dashboard`）
+
+### 技术方案
+| 组件 | 实现 |
+|------|------|
+| 脚本调用 | `subprocess.run` 调用 `~/scripts/gpu_lock.sh` |
+| 自动检查 | 独立 daemon 线程 `gpu-auto-lock` |
+| GPU 探测 | `nvidia-smi --query-gpu=utilization.gpu` |
+
+---
+
 ## v0.6 - AI 告警通知 🔔
 
 **目标**：服务异常自动通过 QQ 推送

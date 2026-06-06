@@ -8,6 +8,7 @@ from flask_cors import CORS
 from config import CFG
 from db import init_db, close_db
 from routes import systems_bp, wsl_bp, backup_bp, webdav_bp, net_bp
+from routes.gpu import gpu_bp, start_gpu_auto_lock
 from routes.wsl import start_metrics_sampler
 from net_collector import start_net_collector
 from utils import _startup_backup_thread, KEY_DIR, BACKUP_BASE
@@ -30,6 +31,7 @@ def create_app():
     app.register_blueprint(backup_bp)
     app.register_blueprint(webdav_bp)
     app.register_blueprint(net_bp)
+    app.register_blueprint(gpu_bp)
 
     # Ensure required directories exist
     os.makedirs(KEY_DIR, exist_ok=True)
@@ -39,6 +41,7 @@ def create_app():
     init_db(app)
     start_metrics_sampler()
     start_net_collector()
+    start_gpu_auto_lock()
     threading.Thread(target=_startup_backup_thread, daemon=True).start()
 
     # --- Page routes ---

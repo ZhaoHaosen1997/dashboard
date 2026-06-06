@@ -144,6 +144,22 @@ def migrate_db():
             acknowledged INTEGER DEFAULT 0)''')
         c.execute('CREATE INDEX idx_net_alert_ts ON net_alert(timestamp)')
 
+    # net_whitelist table (IP whitelist for alert suppression)
+    c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='net_whitelist'")
+    if not c.fetchone():
+        c.execute('''CREATE TABLE net_whitelist (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cidr TEXT NOT NULL UNIQUE,
+            note TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+        # insert default whitelist entries
+        defaults = [
+            ('192.163.20.0/24', '局域网'),
+            ('100.64.0.0/10', 'Tailscale'),
+            ('127.0.0.0/8', '本机回环'),
+        ]
+        c.executemany('INSERT INTO net_whitelist (cidr, note) VALUES (?,?)', defaults)
+
     conn.commit()
     conn.close()
 

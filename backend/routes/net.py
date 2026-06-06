@@ -215,3 +215,37 @@ def ack_alert(alert_id):
     db.execute('UPDATE net_alert SET acknowledged = 1 WHERE id = ?', (alert_id,))
     db.commit()
     return jsonify({'status': 'ok'})
+
+
+@net_bp.route('/api/net/whitelist')
+def net_whitelist():
+    """Get all whitelist entries."""
+    db = get_db()
+    rows = db.execute('SELECT * FROM net_whitelist ORDER BY id').fetchall()
+    return jsonify([dict(r) for r in rows])
+
+
+@net_bp.route('/api/net/whitelist', methods=['POST'])
+def add_whitelist():
+    """Add a whitelist CIDR."""
+    db = get_db()
+    data = request.get_json()
+    cidr = data.get('cidr', '').strip()
+    note = data.get('note', '').strip()
+    if not cidr:
+        return jsonify({'error': 'cidr required'}), 400
+    try:
+        db.execute('INSERT INTO net_whitelist (cidr, note) VALUES (?,?)', (cidr, note))
+        db.commit()
+        return jsonify({'status': 'ok'}), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+
+@net_bp.route('/api/net/whitelist/<int:wid>', methods=['DELETE'])
+def delete_whitelist(wid):
+    """Delete a whitelist entry."""
+    db = get_db()
+    db.execute('DELETE FROM net_whitelist WHERE id = ?', (wid,))
+    db.commit()
+    return jsonify({'status': 'ok'})

@@ -229,6 +229,48 @@
         </div>
     </div>
 
+    <!-- IP 白名单管理 -->
+    <div id="whitelist-section" class="max-w-5xl mx-auto px-6 pb-8 mt-8">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <i data-lucide="shield-check" class="w-4 h-4"></i>
+                IP 告警白名单
+            </h3>
+            <button onclick="showAddWhitelist()" class="btn btn-success text-xs">
+                <i data-lucide="plus" class="w-3 h-3"></i> 添加
+            </button>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200/80 overflow-hidden">
+            <table class="w-full text-sm">
+                <thead class="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                        <th class="text-left px-4 py-2.5 text-xs font-medium text-slate-400">CIDR</th>
+                        <th class="text-left px-4 py-2.5 text-xs font-medium text-slate-400">备注</th>
+                        <th class="w-16 px-4 py-2.5"></th>
+                    </tr>
+                </thead>
+                <tbody id="whitelist-tbody">
+                    <tr><td colspan="3" class="px-4 py-6 text-center text-xs text-slate-300">加载中...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <!-- Add form (hidden by default) -->
+        <div id="whitelist-add" class="mt-3 bg-white rounded-xl border border-slate-200/80 p-4 hidden">
+            <div class="flex items-end gap-3">
+                <div class="flex-1">
+                    <label class="block text-xs font-medium text-slate-500 mb-1">CIDR 地址段</label>
+                    <input type="text" id="whitelist-cidr" placeholder="192.168.1.0/24" class="w-full">
+                </div>
+                <div class="flex-1">
+                    <label class="block text-xs font-medium text-slate-500 mb-1">备注</label>
+                    <input type="text" id="whitelist-note" placeholder="公司内网" class="w-full">
+                </div>
+                <button onclick="addWhitelist()" class="btn btn-primary">添加</button>
+                <button onclick="showAddWhitelist()" class="btn btn-ghost">取消</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Delete Confirm Modal -->
     <div id="delete-modal" class="fixed inset-0 modal-overlay z-50 hidden items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm fade-in">
@@ -361,6 +403,7 @@
             lucide.createIcons();
             loadSystems();
             loadBackupSystems();
+            loadWhitelist();
         });
 
         async function loadSystems() {
@@ -905,6 +948,66 @@
                 if (data.ok) { closeRestoreModal(); showToast('恢复成功', 'success'); loadBackupSystems(); }
                 else showToast(data.error || '恢复失败', 'error');
             } catch { showToast('恢复请求失败', 'error'); }
+        }
+
+        // ===== IP Whitelist =====
+        async function loadWhitelist() {
+            try {
+                const res = await fetch('/api/net/whitelist');
+                const data = await res.json();
+                const tbody = document.getElementById('whitelist-tbody');
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" class="px-4 py-6 text-center text-xs text-slate-300">暂无白名单</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = data.map(w => `
+                    <tr class="border-b border-slate-100 last:border-0">
+                        <td class="px-4 py-2.5 font-mono text-xs text-slate-700">${w.cidr}</td>
+                        <td class="px-4 py-2.5 text-xs text-slate-500">${w.note || '-'}</td>
+                        <td class="px-4 py-2.5 text-right">
+                            <button onclick="deleteWhitelist(${w.id})" class="text-[10px] text-red-400 hover:text-red-600">删除</button>
+                        </td>
+                    </tr>`).join('');
+            } catch { /* silent */ }
+        }
+
+        function showAddWhitelist() {
+            const el = document.getElementById('whitelist-add');
+            el.classList.toggle('hidden');
+            if (!el.classList.contains('hidden')) {
+                document.getElementById('whitelist-cidr').focus();
+            }
+        }
+
+        async function addWhitelist() {
+            const cidr = document.getElementById('whitelist-cidr').value.trim();
+            const note = document.getElementById('whitelist-note').value.trim();
+            if (!cidr) return showToast('请输入 CIDR 地址', 'error');
+            try {
+                const res = await fetch('/api/net/whitelist', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cidr, note })
+                });
+                if (res.ok) {
+                    showToast('白名单已添加', 'success');
+                    document.getElementById('whitelist-cidr').value = '';
+                    document.getElementById('whitelist-note').value = '';
+                    document.getElementById('whitelist-add').classList.add('hidden');
+                    loadWhitelist();
+                } else {
+                    const data = await res.json();
+                    showToast(data.error || '添加失败', 'error');
+                }
+            } catch { showToast('请求失败', 'error'); }
+        }
+
+        async function deleteWhitelist(id) {
+            if (!confirm('确定删除此白名单？')) return;
+            try {
+                await fetch(`/api/net/whitelist/${id}`, { method: 'DELETE' });
+                loadWhitelist();
+                showToast('已删除', 'success');
+            } catch { showToast('删除失败', 'error'); }
         }
     </script>
 </body>

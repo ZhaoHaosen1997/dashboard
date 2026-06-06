@@ -1,4 +1,5 @@
 """Network traffic collector - background threads for vnstat, nethogs, ss."""
+import ipaddress
 import json
 import os
 import re
@@ -273,9 +274,30 @@ def _detect_new_ips(conn, ts, current_ips):
     """Check if any current remote IPs have never been seen in the past 24h."""
     day_ago = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
+    # Load whitelist CIDRs
+    try:
+        whitelist = [row[0] for row in conn.execute('SELECT cidr FROM net_whitelist').fetchall()]
+        whitelist_nets = [ipaddress.ip_network(w, strict=False) for w in whitelist]
+    except Exception:
+        whitelist_nets = []
+
     for ip in current_ips:
         if ip in IGNORE_IPS:
             continue
+
+        # Skip IPv6 mapped addresses for whitelist check (strip ::ffff: prefix)
+        clean_ip = ip.replace('[::ffff:', '').replace(']', '') if ip.startswith('[::ffff:') else ip
+        # Remove brackets from IPv6 addresses
+        clean_ip = clean_ip.strip('[]')
+
+        # Check whitelist
+        try:
+            addr = ipaddress.ip_address(clean_ip)
+            if any(addr in net for net in whitelist_nets):
+                continue
+        except ValueError:
+            pass  # skip unrecognized IP formats
+
         # Check if this IP was seen in last 24h
         existing = conn.execute(
             'SELECT id FROM net_conn WHERE remote_ip=? AND timestamp < ? AND timestamp >= ? LIMIT 1',

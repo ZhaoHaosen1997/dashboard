@@ -12,8 +12,8 @@ from datetime import datetime, timezone, timedelta
 from config import CFG
 from db import DB_PATH
 
-# Monitoring interfaces (eth1 = main WSL NIC, tailscale0 = VPN)
-MONITOR_IFACES = ['eth1', 'tailscale0']
+# Monitoring interfaces - read from config.yml (network.monitor_ifaces)
+MONITOR_IFACES = CFG.get('network', {}).get('monitor_ifaces', ['eth0'])
 
 # Collection intervals
 VSTAT_INTERVAL = 3600       # 1 hour
@@ -96,8 +96,13 @@ def _run_nethogs():
     """Run nethogs in tracemode, parse output, store into net_process."""
     conn = _get_conn()
     try:
+        # Use the first non-tailscale iface for nethogs (it monitors one iface at a time)
+        primary_iface = next(
+            (i for i in MONITOR_IFACES if 'tailscale' not in i),
+            MONITOR_IFACES[0] if MONITOR_IFACES else 'eth0'
+        )
         proc = subprocess.Popen(
-            ['nethogs', '-t', '-d', str(NETHOGS_INTERVAL), 'eth1'],
+            ['nethogs', '-t', '-d', str(NETHOGS_INTERVAL), primary_iface],
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             text=True
         )

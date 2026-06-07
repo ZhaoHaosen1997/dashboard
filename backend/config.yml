@@ -19,6 +19,13 @@ backup:
     monthly: 30
   check_debounce: 3600
 
+network:
+  # 网卡列表：WSL 通常是 eth1，树莓派有线是 eth0，VPN 隧道是 tailscale0
+  # 部署到不同机器时修改此处即可，无需改代码
+  monitor_ifaces:
+    - eth1
+    - tailscale0
+
 metrics:
   interval: 300
   retention_days: 30

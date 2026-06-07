@@ -5,6 +5,9 @@ __pycache__/
 .venv/
 deploy_package.tar.gz
 
+# 本地私有部署脚本（含真实 IP/用户名，不提交）
+*.local.sh
+
 # Windows 环境产生的垃圾文件
 bash.exe.stackdump
 nul

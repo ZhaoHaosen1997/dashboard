@@ -2,3 +2,10 @@ config.db
 __pycache__/
 *.pyc
 .workbuddy/
+.venv/
+deploy_package.tar.gz
+
+# Windows 环境产生的垃圾文件
+bash.exe.stackdump
+nul
+query

@@ -182,7 +182,7 @@ def _run_nethogs():
 # ── ss collector ──────────────────────────────────────────────────
 
 # Regex: Proto Recv-Q Send-Q Local Address:Port Remote Address:Port State PID/Program
-# Example: tcp ESTAB 0 0 192.163.20.118:8850 100.71.140.6:54321 users:(("python",pid=12345,fd=7))
+# Example: tcp ESTAB 0 0 192.168.1.100:8850 1.2.3.4:54321 users:(("python",pid=12345,fd=7))
 _SS_LINE_RE = re.compile(
     r'^(?P<proto>\w+)\s+\w+\s+\d+\s+\d+\s+'
     r'(?P<local>[^\s]+):(?P<lport>\d+)\s+'

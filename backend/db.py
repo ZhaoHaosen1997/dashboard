@@ -152,9 +152,9 @@ def migrate_db():
             cidr TEXT NOT NULL UNIQUE,
             note TEXT DEFAULT '',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
-        # insert default whitelist entries
+        # insert default whitelist entries (customize in the web UI for your actual LAN)
         defaults = [
-            ('192.163.20.0/24', '局域网'),
+            ('192.168.0.0/16', '局域网'),
             ('100.64.0.0/10', 'Tailscale'),
             ('127.0.0.0/8', '本机回环'),
         ]

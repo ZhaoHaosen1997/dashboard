@@ -160,6 +160,26 @@ def migrate_db():
         ]
         c.executemany('INSERT INTO net_whitelist (cidr, note) VALUES (?,?)', defaults)
 
+    # resource_alerts table (threshold alert records)
+    c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='resource_alerts'")
+    if not c.fetchone():
+        c.execute('''CREATE TABLE resource_alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            metric TEXT NOT NULL,
+            value REAL NOT NULL,
+            threshold REAL NOT NULL,
+            notified INTEGER DEFAULT 0,
+            top_processes TEXT)''')
+        c.execute('CREATE INDEX idx_resource_alerts_ts ON resource_alerts(timestamp)')
+        c.execute('CREATE INDEX idx_resource_alerts_metric ON resource_alerts(metric)')
+    else:
+        # Migrate: add top_processes column if missing
+        c.execute("PRAGMA table_info(resource_alerts)")
+        existing = [col[1] for col in c.fetchall()]
+        if 'top_processes' not in existing:
+            c.execute('ALTER TABLE resource_alerts ADD COLUMN top_processes TEXT')
+
     # gpu_lock_log table (lock/unlock event history)
     c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='gpu_lock_log'")
     if not c.fetchone():

@@ -7,6 +7,14 @@ deploy_package.tar.gz
 
 # 本地私有部署脚本（含真实 IP/用户名，不提交）
 *.local.sh
+sync-to-pi.sh
+
+# 本地配置文件（含路径/凭据，开源前替换为 config.example.yml）
+backend/config.yml
+
+# 内部规划文档（含用户名/内网 IP）
+VERSION_PLAN.md
+docs/gpu-lock-api.md
 
 # Windows 环境产生的垃圾文件
 bash.exe.stackdump

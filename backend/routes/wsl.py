@@ -12,6 +12,7 @@ from flask import Blueprint, request, jsonify
 
 from config import CFG
 from db import DB_PATH
+import alerter
 
 wsl_bp = Blueprint('wsl', __name__)
 
@@ -246,6 +247,13 @@ def _sample_metrics():
         conn.execute('DELETE FROM wsl_metrics WHERE timestamp < ?', (cutoff,))
         conn.commit()
         conn.close()
+        # Check resource thresholds and fire alerts if needed
+        alerter.check_and_alert({
+            'cpu':    cpu,
+            'memory': round(mem.percent, 1),
+            'disk':   round(disk.percent, 1),
+            'gpu':    gpu['utilization'] if gpu else None,
+        })
     except Exception:
         pass
 
@@ -363,3 +371,27 @@ def wsl_events():
         (limit,)).fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])
+
+
+@wsl_bp.route('/api/wsl/alerts/status')
+def wsl_alert_status():
+    """Return current alert state for all monitored metrics.
+
+    Used by the frontend to highlight cards in red when a resource is over threshold.
+    Response example:
+      {
+        "cpu":    {"active": false, "hit_count": 0, "threshold": 90},
+        "memory": {"active": true,  "hit_count": 4, "threshold": 90},
+        "disk":   {"active": false, "hit_count": 0, "threshold": 90},
+        "gpu":    {"active": false, "hit_count": 0, "threshold": 85}
+      }
+    """
+    return jsonify(alerter.get_alert_status())
+
+
+@wsl_bp.route('/api/wsl/alerts/history')
+def wsl_alert_history():
+    """Return historical alert records."""
+    days = request.args.get('days', 7, type=int)
+    limit = request.args.get('limit', 200, type=int)
+    return jsonify(alerter.get_alert_history(days=days, limit=limit))

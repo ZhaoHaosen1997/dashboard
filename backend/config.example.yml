@@ -1,0 +1,68 @@
+server:
+  host: '0.0.0.0'
+  port: 8850
+  debug: true
+
+database:
+  path: 'config.db'
+
+encryption:
+  key_dir: '~/.dashboard'
+
+backup:
+  base_dir: '/home/<USER>/backup'     # 替换为实际备份目录
+  default_interval: 'daily'
+  default_keep: 3
+  interval_days:
+    daily: 1
+    weekly: 7
+    monthly: 30
+  check_debounce: 3600
+
+network:
+  # 网卡列表：根据部署机器修改（WSL: eth1, 树莓派有线: eth0, VPN隧道: tailscale0）
+  monitor_ifaces:
+    - eth1
+    - tailscale0
+
+metrics:
+  interval: 300
+  retention_days: 30
+  max_points: 100
+
+timeout:
+  status_check: 3
+  systemctl: 10
+  journalctl: 5
+
+service_labels:
+  start: 启动
+  stop: 停止
+  restart: 重启
+
+# 资源告警阈值配置
+# 各指标超过阈值且连续 consecutive_hits 次才触发告警，避免抖动
+# silence_minutes: 同一指标多少分钟内不重复告警
+alerts:
+  enabled: true
+  consecutive_hits: 3        # 连续超阈值次数（默认3次 = 15分钟@5min采样）
+  silence_minutes: 60        # 同指标告警静默期（分钟）
+  thresholds:
+    cpu:    90               # CPU 使用率 %
+    memory: 90               # 内存使用率 %
+    disk:   90               # 磁盘使用率 %
+    gpu:    85               # GPU 使用率 %（无 GPU 时忽略）
+
+# 通知渠道配置
+notify:
+  # 企业微信群机器人 Webhook
+  wecom_webhook:
+    enabled: false
+    url: ''                  # 从企业微信群 -> 添加机器人 -> 复制 Webhook URL 填入此处
+    # 告警消息模板（支持变量：{host} {metric} {value} {threshold}）
+    title_template: '[Dashboard] {host} 资源告警'
+    body_template: '指标: {metric}\n当前值: {value}%\n阈值: {threshold}%\n时间: {time}'
+
+  # 浏览器桌面通知（需要前端授权，浏览器关闭时无效）
+  browser_notification:
+    enabled: true

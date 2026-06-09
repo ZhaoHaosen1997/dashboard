@@ -68,6 +68,10 @@
         .gpu-locked { border-color: #ef4444 !important; box-shadow: 0 0 12px rgba(239,68,68,0.25); }
         @keyframes pulse { 0%,100% { box-shadow: 0 0 12px rgba(239,68,68,0.25); } 50% { box-shadow: 0 0 20px rgba(239,68,68,0.45); } }
         .gpu-locked.pulse { animation: pulse 2s infinite; }
+        /* Resource alert state */
+        .metric-alert { border-color: #ef4444 !important; }
+        @keyframes alert-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.2); } 50% { box-shadow: 0 0 12px 4px rgba(239,68,68,0.35); } }
+        .metric-alert { animation: alert-pulse 2s infinite; }
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen">
@@ -121,7 +125,7 @@
             <!-- Row1: CPU / Memory / GPU -->
             <div class="grid grid-cols-3 gap-4">
                 <!-- CPU -->
-                <div class="metric-card bg-white rounded-xl border border-slate-200/80 p-4" onclick="showDetail('cpu')">
+                <div class="metric-card bg-white rounded-xl border border-slate-200/80 p-4" id="card-cpu" onclick="showDetail('cpu')">
                     <div class="flex items-center gap-2 mb-3">
                         <div class="w-7 h-7 rounded-md bg-blue-50 flex items-center justify-center">
                             <i data-lucide="cpu" class="w-3.5 h-3.5 text-blue-400"></i>
@@ -135,7 +139,7 @@
                     <svg class="sparkline mt-2" id="cpu-spark"></svg>
                 </div>
                 <!-- Memory -->
-                <div class="metric-card bg-white rounded-xl border border-slate-200/80 p-4" onclick="showDetail('mem')">
+                <div class="metric-card bg-white rounded-xl border border-slate-200/80 p-4" id="card-memory" onclick="showDetail('mem')">
                     <div class="flex items-center gap-2 mb-3">
                         <div class="w-7 h-7 rounded-md bg-emerald-50 flex items-center justify-center">
                             <i data-lucide="memory-stick" class="w-3.5 h-3.5 text-emerald-400"></i>
@@ -264,6 +268,19 @@
                     <span class="text-slate-300">加载中...</span>
                 </div>
             </div>
+
+            <!-- Resource Alert History -->
+            <div class="mt-4 bg-white rounded-xl border border-slate-200/80 p-4">
+                <div class="flex items-center gap-2 mb-3">
+                    <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-400"></i>
+                    <span class="text-xs text-slate-400">告警记录</span>
+                    <span id="alert-history-count" class="text-[10px] bg-red-50 text-red-500 px-1.5 py-0.5 rounded-full hidden"></span>
+                    <button id="alert-history-expand" onclick="toggleAlertHistory()" class="ml-auto text-xs text-blue-500 hover:text-blue-700 hidden">展开全部</button>
+                </div>
+                <div id="alert-history-list" class="space-y-1.5 text-xs text-slate-500">
+                    <span class="text-slate-300">加载中...</span>
+                </div>
+            </div>
         </div>
 
         <!-- Network Monitor -->
@@ -359,6 +376,8 @@
         let lastMetrics = null;
         let showAllProc = false;
         let showAllAlerts = false;
+        let showAllAlertHistory = false;
+        let cachedAlertHistory = [];
 
         // Detail modal state
         let detailInterval = null;
@@ -375,11 +394,120 @@
             loadEvents();
             loadNetData();
             loadGpuLock();
+            loadAlertStatus();
+            loadAlertHistory();
             setInterval(loadMetrics, 30000);
             setInterval(loadHistory, 300000);
             setInterval(loadEvents, 60000);
             setInterval(loadNetData, 120000);
+            setInterval(loadAlertStatus, 30000);
         });
+
+        // ===== Resource Alert Status (v0.6) =====
+        // Maps metric name → card element id
+        const ALERT_CARD_MAP = {
+            cpu:    'card-cpu',
+            memory: 'card-memory',
+            disk:   null,          // disk% is global, no dedicated card on row1; skip visual for now
+            gpu:    'gpu-card',
+        };
+
+        async function loadAlertStatus() {
+            try {
+                const res = await fetch('/api/wsl/alerts/status');
+                if (!res.ok) return;
+                const status = await res.json();
+                let anyActive = false;
+                for (const [metric, info] of Object.entries(status)) {
+                    const cardId = ALERT_CARD_MAP[metric];
+                    if (!cardId) continue;
+                    const card = document.getElementById(cardId);
+                    if (!card) continue;
+                    if (info.active) {
+                        card.classList.add('metric-alert');
+                        anyActive = true;
+                    } else {
+                        // Only remove metric-alert; don't touch gpu-locked class
+                        card.classList.remove('metric-alert');
+                    }
+                }
+                // Browser notification (supplementary, only when tab is open)
+                if (anyActive && 'Notification' in window) {
+                    if (Notification.permission === 'granted') {
+                        const alertMetrics = Object.entries(status)
+                            .filter(([, v]) => v.active)
+                            .map(([k, v]) => `${k.toUpperCase()} ${v.hit_count > 0 ? '超阈值' : ''}`);
+                        if (alertMetrics.length > 0) {
+                            new Notification('Dashboard 资源告警', {
+                                body: alertMetrics.join(' · '),
+                                icon: '/favicon.ico',
+                                tag: 'resource-alert',  // dedup: only one notification at a time
+                                renotify: false
+                            });
+                        }
+                    } else if (Notification.permission === 'default') {
+                        Notification.requestPermission();
+                    }
+                }
+            } catch {}
+        }
+
+        // ===== Resource Alert History (v0.6) =====
+        function renderAlertHistory(alerts, showAll) {
+            const el = document.getElementById('alert-history-list');
+            const badge = document.getElementById('alert-history-count');
+            const btn = document.getElementById('alert-history-expand');
+            if (!alerts || alerts.length === 0) {
+                el.innerHTML = '<span class="text-slate-300">暂无告警</span>';
+                badge.classList.add('hidden');
+                btn.classList.add('hidden');
+                return;
+            }
+            badge.textContent = alerts.length;
+            badge.classList.remove('hidden');
+            const display = showAll ? alerts : alerts.slice(0, 3);
+            if (alerts.length > 3) {
+                btn.classList.remove('hidden');
+                btn.textContent = showAll ? '收起' : `展开全部 (${alerts.length})`;
+            } else {
+                btn.classList.add('hidden');
+            }
+            el.innerHTML = display.map(a => {
+                const metricIcon = { cpu: 'cpu', memory: 'memory-stick', disk: 'hard-drive', gpu: 'gpu' }[a.metric] || 'alert-triangle';
+                const ts = new Date(a.timestamp).toLocaleString('zh-CN', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+                // Top processes
+                let procsHtml = '';
+                if (a.top_processes && a.top_processes.length > 0) {
+                    procsHtml = a.top_processes.slice(0, 5).map(p =>
+                        `<span class="inline-block bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded mr-1 mb-0.5 text-[10px]">${p.name} <span class="text-red-400">${p.cpu}%</span></span>`
+                    ).join('');
+                }
+                return `<div class="py-1.5">
+                    <div class="flex items-center gap-2">
+                        <span class="text-red-400">⚠</span>
+                        <span class="font-medium text-slate-600">${a.metric.toUpperCase()}</span>
+                        <span class="text-red-500 font-semibold">${a.value}%</span>
+                        <span class="text-slate-300">阈值 ${a.threshold}%</span>
+                        <span class="text-slate-300 ml-auto">${ts}</span>
+                    </div>
+                    ${procsHtml ? '<div class="ml-5 mt-0.5">' + procsHtml + '</div>' : ''}
+                </div>`;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        async function loadAlertHistory() {
+            try {
+                const res = await fetch('/api/wsl/alerts/history?days=7&limit=50');
+                cachedAlertHistory = await res.json();
+                renderAlertHistory(cachedAlertHistory, showAllAlertHistory);
+            } catch {}
+        }
+
+        function toggleAlertHistory() {
+            showAllAlertHistory = !showAllAlertHistory;
+            renderAlertHistory(cachedAlertHistory, showAllAlertHistory);
+        }
 
         // ===== Systems =====
         async function loadSystems() {

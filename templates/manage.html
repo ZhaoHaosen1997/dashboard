@@ -34,12 +34,38 @@
         .btn-ghost:hover:not(:disabled) { background: #e2e8f0; }
         .modal-overlay { background: rgba(15,23,42,0.5); backdrop-filter: blur(2px); }
         .log-viewer {
-            background: #1e293b; color: #e2e8f0; font-family: 'Cascadia Code', 'Fira Code', monospace;
-            font-size: 0.75rem; line-height: 1.6; white-space: pre-wrap; word-break: break-all;
-            max-height: 60vh; overflow-y: auto;
+            background: #0f172a; color: #94a3b8; font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.73rem; line-height: 1.65; white-space: pre-wrap; word-break: break-all;
+            height: 62vh; overflow-y: auto; padding: 1rem;
         }
         .log-viewer::-webkit-scrollbar { width: 6px; }
-        .log-viewer::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        .log-viewer::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        /* Log level colors */
+        .log-line-error   { color: #f87171; }
+        .log-line-warning { color: #fbbf24; }
+        .log-line-info    { color: #7dd3fc; }
+        .log-line-debug   { color: #6b7280; }
+        .log-line-default { color: #94a3b8; }
+        /* tail pulse indicator */
+        @keyframes tail-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .tail-active { animation: tail-pulse 1.5s infinite; }
+        /* Log level filter chips */
+        .log-filter-chip {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 2px 9px; border-radius: 9999px; font-size: 11px; font-weight: 500;
+            cursor: pointer; border: 1px solid transparent; transition: all 0.15s; line-height: 1.5;
+            user-select: none;
+        }
+        .log-filter-chip.all         { color: #64748b; background: #f1f5f9; border-color: #e2e8f0; }
+        .log-filter-chip.all.active  { color: #1e293b; background: #e2e8f0; border-color: #cbd5e1; }
+        .log-filter-chip.error       { color: #dc2626; background: #fff1f1; border-color: #fecaca; }
+        .log-filter-chip.error.active{ color: #fff; background: #ef4444; border-color: #ef4444; }
+        .log-filter-chip.warning     { color: #b45309; background: #fffbeb; border-color: #fde68a; }
+        .log-filter-chip.warning.active{ color: #fff; background: #f59e0b; border-color: #f59e0b; }
+        .log-filter-chip.info        { color: #0369a1; background: #f0f9ff; border-color: #bae6fd; }
+        .log-filter-chip.info.active { color: #fff; background: #0ea5e9; border-color: #0ea5e9; }
+        .log-filter-chip.debug       { color: #6b7280; background: #f9fafb; border-color: #e5e7eb; }
+        .log-filter-chip.debug.active{ color: #fff; background: #9ca3af; border-color: #9ca3af; }
         .toast {
             position: fixed; bottom: 24px; right: 24px; z-index: 100;
             padding: 0.75rem 1rem; border-radius: 0.75rem; font-size: 0.875rem;
@@ -203,7 +229,7 @@
                     <div id="backup-fields" class="space-y-3 hidden">
                         <div>
                             <label class="block text-xs font-medium text-slate-500 mb-1">数据库路径 *</label>
-                            <input type="text" id="db_path" placeholder="/home/zhaohaosen/applications/xxx/data/app.db">
+                            <input type="text" id="db_path" placeholder="/home/user/app/data/app.db">
                         </div>
                         <div class="grid grid-cols-2 gap-3">
                             <div>
@@ -290,26 +316,63 @@
 
     <!-- Log Viewer Modal -->
     <div id="log-modal" class="fixed inset-0 modal-overlay z-50 hidden items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl fade-in">
-            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                    <i data-lucide="terminal" class="w-4 h-4 text-slate-400"></i>
-                    <h2 class="text-base font-semibold text-slate-800">
-                        日志 · <span id="log-service-name" class="text-slate-400 font-normal"></span>
-                    </h2>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button onclick="refreshLogs()" class="btn btn-ghost">
-                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-                        刷新
-                    </button>
-                    <button onclick="closeLogModal()" class="text-slate-300 hover:text-slate-500 transition-colors">
-                        <i data-lucide="x" class="w-5 h-5"></i>
-                    </button>
-                </div>
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-5xl fade-in flex flex-col" style="max-height:88vh">
+            <!-- Header -->
+            <div class="px-5 py-3.5 border-b border-slate-100 flex items-center gap-3 shrink-0">
+                <i data-lucide="terminal" class="w-4 h-4 text-slate-400"></i>
+                <h2 class="text-sm font-semibold text-slate-800">
+                    日志 · <span id="log-service-name" class="text-slate-400 font-normal"></span>
+                </h2>
+                <!-- Lines selector -->
+                <select id="log-lines" onchange="refreshLogs()" class="ml-2 text-xs bg-slate-100 border-0 rounded px-2 py-1 text-slate-500 cursor-pointer" style="width:auto">
+                    <option value="50">50 行</option>
+                    <option value="100" selected>100 行</option>
+                    <option value="200">200 行</option>
+                    <option value="500">500 行</option>
+                </select>
+                <!-- Tail toggle -->
+                <button id="tail-btn" onclick="toggleTail()" class="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border transition-all"
+                        style="border-color:#e2e8f0;color:#94a3b8" title="自动跟踪最新日志">
+                    <span id="tail-dot" class="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
+                    <span id="tail-label">Tail</span>
+                </button>
+                <!-- Clear -->
+                <button onclick="clearLogView()" class="text-xs px-2.5 py-1 rounded-md border border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all" title="清屏">
+                    <i data-lucide="eraser" class="w-3.5 h-3.5 inline -mt-0.5"></i> 清屏
+                </button>
+                <!-- Refresh -->
+                <button onclick="refreshLogs()" class="text-xs px-2.5 py-1 rounded-md border border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5 inline -mt-0.5"></i> 刷新
+                </button>
+                <button onclick="closeLogModal()" class="ml-auto text-slate-300 hover:text-slate-500 transition-colors p-1">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
             </div>
-            <div id="log-content" class="log-viewer rounded-b-xl p-4">
-                加载中...
+            <!-- Level filter chips -->
+            <div class="px-5 py-2 border-b border-slate-100 flex items-center gap-2 shrink-0 flex-wrap">
+                <span class="text-[10px] text-slate-400 font-medium uppercase tracking-wide mr-1">过滤</span>
+                <button class="log-filter-chip all active" data-level="all" onclick="setLogFilter('all')">全部</button>
+                <button class="log-filter-chip error" data-level="error" onclick="setLogFilter('error')">
+                    <span class="w-1.5 h-1.5 rounded-full bg-current inline-block"></span>ERROR
+                    <span id="log-count-error" class="text-[9px] opacity-60"></span>
+                </button>
+                <button class="log-filter-chip warning" data-level="warning" onclick="setLogFilter('warning')">
+                    <span class="w-1.5 h-1.5 rounded-full bg-current inline-block"></span>WARNING
+                    <span id="log-count-warning" class="text-[9px] opacity-60"></span>
+                </button>
+                <button class="log-filter-chip info" data-level="info" onclick="setLogFilter('info')">
+                    <span class="w-1.5 h-1.5 rounded-full bg-current inline-block"></span>INFO
+                    <span id="log-count-info" class="text-[9px] opacity-60"></span>
+                </button>
+                <button class="log-filter-chip debug" data-level="debug" onclick="setLogFilter('debug')">
+                    <span class="w-1.5 h-1.5 rounded-full bg-current inline-block"></span>DEBUG
+                    <span id="log-count-debug" class="text-[9px] opacity-60"></span>
+                </button>
+                <span id="log-match-hint" class="ml-auto text-[10px] text-slate-300"></span>
+            </div>
+            <!-- Log content -->
+            <div id="log-content" class="log-viewer rounded-b-xl flex-1 overflow-y-auto">
+                <span class="log-line-debug">加载中...</span>
             </div>
         </div>
     </div>
@@ -620,36 +683,179 @@
             }
         }
 
-        // Logs
+        // ===== Logs =====
+        let tailInterval = null;
+        let tailEnabled = false;
+        let currentLogRaw = '';       // raw log text cached for re-filtering
+        let currentLogFilter = 'all'; // active level filter
+
         function openLogModal(id) {
             logSystemId = id;
             const s = systems.find(x => x.id === id);
             document.getElementById('log-service-name').textContent = s?.service_name || '';
             document.getElementById('log-modal').classList.remove('hidden');
             document.getElementById('log-modal').classList.add('flex');
+            // Reset tail state & filter
+            tailEnabled = false;
+            currentLogFilter = 'all';
+            _updateTailUI();
+            _updateFilterChips();
             refreshLogs();
         }
 
         function closeLogModal() {
             logSystemId = null;
+            tailEnabled = false;
+            if (tailInterval) { clearInterval(tailInterval); tailInterval = null; }
+            _updateTailUI();
+            currentLogRaw = '';
+            currentLogFilter = 'all';
             document.getElementById('log-modal').classList.add('hidden');
             document.getElementById('log-modal').classList.remove('flex');
+        }
+
+        function clearLogView() {
+            const el = document.getElementById('log-content');
+            el.innerHTML = '<span class="log-line-debug">-- 已清屏 --</span>';
+        }
+
+        function toggleTail() {
+            tailEnabled = !tailEnabled;
+            _updateTailUI();
+            if (tailEnabled) {
+                refreshLogs();
+                tailInterval = setInterval(refreshLogs, 5000);
+            } else {
+                if (tailInterval) { clearInterval(tailInterval); tailInterval = null; }
+            }
+        }
+
+        function _updateTailUI() {
+            const btn = document.getElementById('tail-btn');
+            const dot = document.getElementById('tail-dot');
+            const label = document.getElementById('tail-label');
+            if (tailEnabled) {
+                btn.style.borderColor = '#22c55e';
+                btn.style.color = '#16a34a';
+                btn.style.background = '#f0fdf4';
+                dot.className = 'w-1.5 h-1.5 rounded-full bg-green-500 tail-active';
+                label.textContent = 'Tail 开';
+            } else {
+                btn.style.borderColor = '#e2e8f0';
+                btn.style.color = '#94a3b8';
+                btn.style.background = '';
+                dot.className = 'w-1.5 h-1.5 rounded-full bg-slate-300';
+                label.textContent = 'Tail';
+            }
+        }
+
+        function setLogFilter(level) {
+            currentLogFilter = level;
+            _updateFilterChips();
+            _applyLogFilter();
+        }
+
+        function _updateFilterChips() {
+            document.querySelectorAll('.log-filter-chip').forEach(chip => {
+                chip.classList.toggle('active', chip.dataset.level === currentLogFilter);
+            });
+        }
+
+        // Classify a single log line → level key
+        function _classifyLine(line) {
+            const upper = line.toUpperCase();
+            if (/\b(ERROR|CRITICAL|FATAL|ERR\b|TRACEBACK|EXCEPTION)\b/.test(upper)) return 'error';
+            if (/\b(WARNING|WARN|CAUTION)\b/.test(upper)) return 'warning';
+            if (/\bINFO\b/.test(upper)) return 'info';
+            if (/\bDEBUG\b/.test(upper)) return 'debug';
+            return 'default';
+        }
+
+        function _applyLogFilter() {
+            const el = document.getElementById('log-content');
+            if (!currentLogRaw) return;
+            const lines = currentLogRaw.split('\n');
+
+            // Count each level
+            const counts = { error: 0, warning: 0, info: 0, debug: 0 };
+            for (const line of lines) {
+                const lvl = _classifyLine(line);
+                if (counts[lvl] !== undefined) counts[lvl]++;
+            }
+            ['error', 'warning', 'info', 'debug'].forEach(lvl => {
+                const badge = document.getElementById(`log-count-${lvl}`);
+                if (badge) badge.textContent = counts[lvl] > 0 ? counts[lvl] : '';
+            });
+
+            // Filter & render
+            let filtered = lines;
+            if (currentLogFilter !== 'all') {
+                filtered = lines.filter(line => {
+                    const lvl = _classifyLine(line);
+                    return currentLogFilter === 'debug'
+                        ? (lvl === 'debug' || lvl === 'default')  // debug also shows unclassified
+                        : lvl === currentLogFilter;
+                });
+            }
+
+            const hint = document.getElementById('log-match-hint');
+            if (currentLogFilter !== 'all') {
+                hint.textContent = `${filtered.length} / ${lines.length} 行`;
+            } else {
+                hint.textContent = '';
+            }
+
+            el.innerHTML = filtered.length === 0
+                ? `<span class="log-line-debug">-- 当前级别无匹配日志 --</span>`
+                : filtered.map(line => {
+                    const lvl = _classifyLine(line);
+                    const cls = lvl === 'error' ? 'log-line-error'
+                              : lvl === 'warning' ? 'log-line-warning'
+                              : lvl === 'info' ? 'log-line-info'
+                              : lvl === 'debug' ? 'log-line-debug'
+                              : 'log-line-default';
+                    const escaped = line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                    return `<span class="${cls}">${escaped}</span>`;
+                }).join('\n');
+
+            el.scrollTop = el.scrollHeight;
+        }
+
+        function _colorizeLog(raw) {
+            // Colorize each line based on log level — delegates to _classifyLine
+            if (!raw) return '<span class="log-line-debug">(无日志)</span>';
+            return raw.split('\n').map(line => {
+                const lvl = _classifyLine(line);
+                const cls = lvl === 'error' ? 'log-line-error'
+                          : lvl === 'warning' ? 'log-line-warning'
+                          : lvl === 'info' ? 'log-line-info'
+                          : lvl === 'debug' ? 'log-line-debug'
+                          : 'log-line-default';
+                const escaped = line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                return `<span class="${cls}">${escaped}</span>`;
+            }).join('\n');
         }
 
         async function refreshLogs() {
             if (!logSystemId) return;
             const el = document.getElementById('log-content');
-            el.textContent = '加载中...';
+            const lines = document.getElementById('log-lines')?.value || 100;
+            // Don't reset content while tail is active (just append/replace silently)
+            if (!tailEnabled) {
+                el.innerHTML = '<span class="log-line-debug">加载中...</span>';
+            }
             try {
-                const res = await fetch(`/api/systems/${logSystemId}/logs?lines=100`);
+                const res = await fetch(`/api/systems/${logSystemId}/logs?lines=${lines}`);
                 const data = await res.json();
-                if (data.logs) {
-                    el.textContent = data.logs || '(无日志)';
+                if (data.logs !== undefined) {
+                    currentLogRaw = data.logs;
+                    _applyLogFilter();
                 } else {
-                    el.textContent = data.error || '加载失败';
+                    currentLogRaw = '';
+                    el.innerHTML = `<span class="log-line-error">${(data.error || '加载失败').replace(/</g,'&lt;')}</span>`;
                 }
             } catch {
-                el.textContent = '请求失败';
+                el.innerHTML = '<span class="log-line-error">请求失败</span>';
             }
             lucide.createIcons();
         }
@@ -672,7 +878,7 @@
             if (e.key === 'Escape') {
                 closeModal();
                 closeDeleteModal();
-                closeLogModal();
+                closeLogModal();   // also stops tail
                 closeBackupListModal();
                 closeWebdavModal();
                 closeRestoreModal();

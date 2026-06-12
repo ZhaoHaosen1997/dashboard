@@ -1,4 +1,5 @@
 """GPU lock management routes + auto lock/unlock background thread."""
+import logging
 import sqlite3
 import subprocess
 import threading
@@ -7,10 +8,13 @@ from datetime import datetime, timezone
 from flask import Blueprint, request, jsonify
 
 from db import DB_PATH
+from config import CFG
+
+logger = logging.getLogger(__name__)
 
 gpu_bp = Blueprint('gpu', __name__)
 
-LOCK_SCRIPT = '/home/zhaohaosen/scripts/gpu_lock.sh'
+LOCK_SCRIPT = CFG.get('gpu', {}).get('lock_script', '/home/zhaohaosen/scripts/gpu_lock.sh')
 
 # Auto lock/unlock config
 AUTO_CHECK_INTERVAL = 15       # seconds between GPU idle checks
@@ -79,7 +83,7 @@ def _log_event(action, who, source='manual'):
         conn.commit()
         conn.close()
     except Exception:
-        pass
+        logger.exception('Failed to record GPU lock event')
 
 
 def _get_logs(limit=10):
@@ -93,6 +97,7 @@ def _get_logs(limit=10):
         conn.close()
         return [dict(r) for r in rows]
     except Exception:
+        logger.exception('Failed to fetch GPU lock logs')
         return []
 
 

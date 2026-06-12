@@ -13,6 +13,7 @@ def get_db():
     if 'db' not in g:
         g.db = sqlite3.connect(DB_PATH)
         g.db.row_factory = sqlite3.Row
+        g.db.execute('PRAGMA busy_timeout=3000')
     return g.db
 
 
@@ -27,6 +28,9 @@ def migrate_db():
     """Incremental migration: add new columns and tables as needed."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
+
+    # Ensure WAL mode is enabled (persistent, no-op if already set)
+    c.execute('PRAGMA journal_mode=WAL')
 
     # systems table migrations
     c.execute("PRAGMA table_info(systems)")
@@ -202,6 +206,9 @@ def init_db(app):
         # Bootstrap systems table and default rows first
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
+        # Enable WAL mode for concurrent read/write from background threads
+        c.execute('PRAGMA journal_mode=WAL')
+        c.execute('PRAGMA busy_timeout=3000')
         c.execute('''CREATE TABLE systems (
             id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, url TEXT NOT NULL,
             port INTEGER, description TEXT, icon TEXT DEFAULT 'box', color TEXT DEFAULT '#3b82f6',

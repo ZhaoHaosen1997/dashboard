@@ -66,3 +66,7 @@ notify:
   # 浏览器桌面通知（需要前端授权，浏览器关闭时无效）
   browser_notification:
     enabled: true
+
+# GPU 锁管理
+gpu:
+  lock_script: '/home/zhaohaosen/scripts/gpu_lock.sh'  # GPU 锁定脚本路径

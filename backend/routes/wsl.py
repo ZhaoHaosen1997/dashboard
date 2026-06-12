@@ -5,6 +5,7 @@ import subprocess
 import threading
 import time
 import atexit
+import logging
 from datetime import datetime, timedelta, timezone
 
 import psutil
@@ -13,6 +14,8 @@ from flask import Blueprint, request, jsonify
 from config import CFG
 from db import DB_PATH
 import alerter
+
+logger = logging.getLogger(__name__)
 
 wsl_bp = Blueprint('wsl', __name__)
 
@@ -131,38 +134,69 @@ def _get_io_rates():
 
 
 def _get_top_processes(n=20):
-    """Get top N processes by CPU usage, with rich info."""
-    procs = []
-    now = time.time()
-    for p in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_info', 'memory_percent', 'num_threads', 'status', 'create_time']):
+    """Get top N processes by CPU usage, with rich info.
+
+    Uses two-pass sampling because psutil per-process cpu_percent() returns 0
+    on the first call and only produces real values on the second call
+    (it needs a reference point to calculate the delta).
+    """
+    # First pass: collect process objects and warm up cpu_percent()
+    proc_objs = []
+    for p in psutil.process_iter(['pid', 'name', 'memory_info', 'memory_percent',
+                                   'num_threads', 'status', 'create_time']):
         try:
-            info = p.info
-            if info['cpu_percent'] is None:
-                info['cpu_percent'] = 0
-            # Calculate runtime
-            runtime = ''
-            if info.get('create_time'):
-                secs = int(now - info['create_time'])
-                h, rem = divmod(secs, 3600)
-                m, s = divmod(rem, 60)
-                if h > 0:
-                    runtime = f'{h}h{m}m'
-                elif m > 0:
-                    runtime = f'{m}m{s}s'
-                else:
-                    runtime = f'{s}s'
-            procs.append({
-                'pid': info['pid'],
-                'name': info['name'] or 'unknown',
-                'cpu': round(info['cpu_percent'], 1),
-                'mem_mb': round((info['memory_info'].rss or 0) / (1024 ** 2), 1) if info.get('memory_info') else 0,
-                'mem_pct': round(info.get('memory_percent') or 0, 1),
-                'threads': info.get('num_threads') or 0,
-                'status': (info.get('status') or '?').lower(),
-                'runtime': runtime
-            })
+            p.cpu_percent()  # discard first result, establishes baseline
+            proc_objs.append(p)
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             pass
+
+    # Brief wait for a meaningful delta
+    time.sleep(0.1)
+
+    # Second pass: now cpu_percent() returns real values
+    procs = []
+    now = time.time()
+    for p in proc_objs:
+        try:
+            with p.oneshot():
+                cpu = p.cpu_percent()
+                mem_info = p.memory_info()
+                mem_percent = p.memory_percent()
+                name = p.name()
+                pid = p.pid
+                threads = p.num_threads()
+                status = p.status()
+                create_time = p.create_time()
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            continue
+
+        if cpu is None:
+            cpu = 0.0
+
+        # Calculate runtime
+        runtime = ''
+        if create_time:
+            secs = int(now - create_time)
+            h, rem = divmod(secs, 3600)
+            m, s = divmod(rem, 60)
+            if h > 0:
+                runtime = f'{h}h{m}m'
+            elif m > 0:
+                runtime = f'{m}m{s}s'
+            else:
+                runtime = f'{s}s'
+
+        procs.append({
+            'pid': pid,
+            'name': name or 'unknown',
+            'cpu': round(cpu, 1),
+            'mem_mb': round((mem_info.rss or 0) / (1024 ** 2), 1) if mem_info else 0,
+            'mem_pct': round(mem_percent or 0, 1),
+            'threads': threads or 0,
+            'status': (status or '?').lower(),
+            'runtime': runtime
+        })
+
     procs.sort(key=lambda x: x['cpu'], reverse=True)
     return procs[:n]
 
@@ -239,11 +273,8 @@ def _sample_metrics():
              io['disk_read_rate'], io['disk_write_rate'],
              io['net_sent_rate'], io['net_recv_rate'],
              round(load1, 2), round(load5, 2), round(load15, 2)))
-        conn.commit()
-        conn.close()
-        # Cleanup old data
+        # Cleanup old data in the same transaction
         cutoff = (datetime.now(timezone.utc) - timedelta(days=METRICS_RETENTION_DAYS)).strftime('%Y-%m-%dT%H:%M:%SZ')
-        conn = sqlite3.connect(DB_PATH)
         conn.execute('DELETE FROM wsl_metrics WHERE timestamp < ?', (cutoff,))
         conn.commit()
         conn.close()
@@ -255,7 +286,7 @@ def _sample_metrics():
             'gpu':    gpu['utilization'] if gpu else None,
         })
     except Exception:
-        pass
+        logger.exception('Metrics sample failed')
 
 
 def _sampler_loop():
@@ -288,7 +319,7 @@ def wsl_metrics():
         load_avg = [0, 0, 0]
     top_procs = _get_top_processes(20)
 
-    uptime_hours = (psutil.time.time() - psutil.boot_time()) / 3600
+    uptime_hours = (time.time() - psutil.boot_time()) / 3600
     if uptime_hours >= 24:
         uptime_str = f'{int(uptime_hours // 24)}d {int(uptime_hours % 24)}h'
     else:

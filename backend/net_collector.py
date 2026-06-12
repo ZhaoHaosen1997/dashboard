@@ -1,6 +1,7 @@
 """Network traffic collector - background threads for vnstat, nethogs, ss."""
 import ipaddress
 import json
+import logging
 import os
 import re
 import sqlite3
@@ -11,6 +12,8 @@ from datetime import datetime, timezone, timedelta
 
 from config import CFG
 from db import DB_PATH
+
+logger = logging.getLogger(__name__)
 
 # Monitoring interfaces - read from config.yml (network.monitor_ifaces)
 MONITOR_IFACES = CFG.get('network', {}).get('monitor_ifaces', ['eth0'])
@@ -44,7 +47,7 @@ def _collect_vnstat():
     conn = _get_conn()
     try:
         result = subprocess.run(
-            ['vnstat', '--json', 'h'],
+            ['vnstat', '--json', 'h', '50'],
             capture_output=True, text=True, timeout=10
         )
         if result.returncode != 0:
@@ -76,7 +79,7 @@ def _collect_vnstat():
                 )
         conn.commit()
     except Exception:
-        pass
+        logger.exception('vnstat collection failed')
     finally:
         conn.close()
 
@@ -93,7 +96,23 @@ _NETHOGS_UNKNOWN_RE = re.compile(
 
 
 def _run_nethogs():
-    """Run nethogs in tracemode, parse output, store into net_process."""
+    """Run nethogs in tracemode with auto-restart on crash.
+
+    If the nethogs process exits or crashes, this restarts it after a brief delay.
+    """
+    RESTART_DELAY = 10  # seconds between restart attempts
+
+    while not _stop.is_set():
+        try:
+            _run_nethogs_once()
+        except Exception:
+            logger.exception('nethogs collector crashed, restarting in %ss', RESTART_DELAY)
+        if not _stop.is_set():
+            _stop.wait(RESTART_DELAY)
+
+
+def _run_nethogs_once():
+    """Single nethogs session: parse output and store into net_process."""
     conn = _get_conn()
     try:
         # Use the first non-tailscale iface for nethogs (it monitors one iface at a time)
@@ -114,6 +133,7 @@ def _run_nethogs():
             line = proc.stdout.readline()
             if not line:
                 if proc.poll() is not None:
+                    logger.warning('nethogs process exited unexpectedly (rc=%s)', proc.returncode)
                     break
                 continue
 
@@ -174,7 +194,7 @@ def _run_nethogs():
         proc.terminate()
         proc.wait(timeout=5)
     except Exception:
-        pass
+        logger.exception('nethogs collector crashed')
     finally:
         conn.close()
 
@@ -270,7 +290,7 @@ def _collect_ss():
         _detect_new_ips(conn, ts, current_ips)
 
     except Exception:
-        pass
+        logger.exception('ss collection failed')
     finally:
         conn.close()
 
@@ -376,7 +396,7 @@ def _cleanup_loop():
         try:
             _cleanup_old_data(conn)
         except Exception:
-            pass
+            logger.exception('network data cleanup failed')
         finally:
             conn.close()
         _stop.wait(CLEANUP_INTERVAL)

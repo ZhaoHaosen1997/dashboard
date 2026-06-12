@@ -11,6 +11,7 @@ import json
 import logging
 import sqlite3
 import threading
+import time
 from datetime import datetime, timedelta, timezone
 
 import psutil
@@ -61,26 +62,46 @@ def _get_top_processes(n: int = 8) -> list:
     """Snapshot top N processes by CPU% at the moment of alert.
 
     Returns a list of dicts with: pid, name, cpu, mem_mb, mem_pct.
-    Safe to call from any thread; psutil errors are suppressed.
+    Uses two-pass sampling because psutil per-process cpu_percent() returns 0
+    on the first call.
     """
     try:
-        procs = []
-        for p in psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_info', 'memory_percent']):
+        # First pass: collect process objects and warm up cpu_percent()
+        proc_objs = []
+        for p in psutil.process_iter(['pid', 'name', 'memory_info', 'memory_percent']):
             try:
-                info = p.info
-                cpu = info.get('cpu_percent') or 0.0
-                mem_info = info.get('memory_info')
-                mem_mb = round(mem_info.rss / 1024 / 1024, 1) if mem_info else 0.0
-                mem_pct = round(info.get('memory_percent') or 0.0, 1)
-                procs.append({
-                    'pid':     info['pid'],
-                    'name':    info.get('name', '?'),
-                    'cpu':     round(cpu, 1),
-                    'mem_mb':  mem_mb,
-                    'mem_pct': mem_pct,
-                })
+                p.cpu_percent()  # discard first result, establishes baseline
+                proc_objs.append(p)
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 pass
+
+        time.sleep(0.1)  # brief wait for meaningful delta
+
+        # Second pass: now cpu_percent() returns real values
+        procs = []
+        for p in proc_objs:
+            try:
+                with p.oneshot():
+                    cpu = p.cpu_percent()
+                    mem_info = p.memory_info()
+                    mem_percent = p.memory_percent()
+                    name = p.name()
+                    pid = p.pid
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+
+            cpu = cpu or 0.0
+            mem_mb = round(mem_info.rss / 1024 / 1024, 1) if mem_info else 0.0
+            mem_pct = round(mem_percent or 0.0, 1)
+
+            procs.append({
+                'pid':     pid,
+                'name':    name or '?',
+                'cpu':     round(cpu, 1),
+                'mem_mb':  mem_mb,
+                'mem_pct': mem_pct,
+            })
+
         # Sort by CPU% descending, break ties by memory
         procs.sort(key=lambda x: (-x['cpu'], -x['mem_mb']))
         return procs[:n]

@@ -8,6 +8,15 @@ deploy_package.tar.gz
 # 本地私有部署脚本（含真实 IP/用户名，不提交）
 *.local.sh
 sync-to-pi.sh
+sync-to-wsl.sh
+deploy-to-wsl.ps1
+
+# Node.js 构建工具（Tailwind CSS 编译，仅开发端使用）
+node_modules/
+package.json
+package-lock.json
+tailwind.config.js
+tailwind.input.css
 
 # 本地配置文件（含路径/凭据，开源前替换为 config.example.yml）
 backend/config.yml

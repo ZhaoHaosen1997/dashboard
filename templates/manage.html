@@ -4,97 +4,263 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>系统管理 - Dashboard</title>
-    <script src="/static/js/tailwind.js"></script>
+    <link rel="stylesheet" href="/static/css/tailwind.min.css">
     <script src="/static/js/lucide.min.js"></script>
     <style>
         * { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+
+        /* ===== Global Background ===== */
+        body {
+            background: #f8fafc;
+            background-image:
+                radial-gradient(at 10% 0%, rgba(99,102,241,0.05) 0px, transparent 50%),
+                radial-gradient(at 90% 100%, rgba(59,130,246,0.04) 0px, transparent 50%);
+            min-height: 100vh;
+        }
+
+        /* ===== Header ===== */
+        .site-header {
+            background: rgba(255,255,255,0.85);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border-bottom: 1px solid rgba(226,232,240,0.8);
+            position: sticky; top: 0; z-index: 40;
+            box-shadow: 0 1px 0 0 rgba(0,0,0,0.04), 0 4px 16px -8px rgba(0,0,0,0.06);
+        }
+
+        /* ===== Status dots ===== */
         .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-        .status-online { background: #10b981; box-shadow: 0 0 6px rgba(16,185,129,0.5); }
+        .status-online { background: #10b981; box-shadow: 0 0 0 2px rgba(16,185,129,0.2), 0 0 8px rgba(16,185,129,0.5); animation: online-pulse 2.5s ease-in-out infinite; }
         .status-offline { background: #fca5a5; }
-        .status-checking { background: #fbbf24; animation: pulse 1s infinite; }
-        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
-        .fade-in { animation: fadeIn 0.2s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        .status-checking { background: #fbbf24; animation: checking-pulse 0.9s ease-in-out infinite; }
+        @keyframes online-pulse { 0%,100% { box-shadow: 0 0 0 2px rgba(16,185,129,0.2), 0 0 6px rgba(16,185,129,0.4); } 50% { box-shadow: 0 0 0 3px rgba(16,185,129,0.1), 0 0 12px rgba(16,185,129,0.6); } }
+        @keyframes checking-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        /* ===== Fade in ===== */
+        .fade-in { animation: fadeIn 0.3s cubic-bezier(.22,1,.36,1) both; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* ===== Buttons ===== */
         .btn {
             display: inline-flex; align-items: center; gap: 0.375rem;
-            padding: 0.375rem 0.75rem; border-radius: 0.5rem;
-            font-size: 0.8125rem; font-weight: 500; transition: all 0.15s;
+            padding: 0.375rem 0.75rem; border-radius: 0.6rem;
+            font-size: 0.8125rem; font-weight: 500;
+            transition: all 0.18s cubic-bezier(.22,1,.36,1);
             cursor: pointer; border: none; outline: none;
+            position: relative; overflow: hidden;
         }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn-primary { background: #3b82f6; color: white; }
-        .btn-primary:hover:not(:disabled) { background: #2563eb; }
-        .btn-danger { background: #fee2e2; color: #dc2626; }
-        .btn-danger:hover:not(:disabled) { background: #fecaca; }
-        .btn-success { background: #dcfce7; color: #16a34a; }
-        .btn-success:hover:not(:disabled) { background: #bbf7d0; }
-        .btn-warning { background: #fef3c7; color: #d97706; }
+        .btn::after {
+            content: ''; position: absolute; inset: 0;
+            background: rgba(255,255,255,0.15); opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .btn:not(:disabled):hover::after { opacity: 1; }
+        .btn:not(:disabled):active { transform: scale(0.97); }
+
+        .btn-primary { background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; box-shadow: 0 2px 8px rgba(59,130,246,0.25); }
+        .btn-primary:hover:not(:disabled) { background: linear-gradient(135deg, #2563eb, #1d4ed8); box-shadow: 0 4px 12px rgba(59,130,246,0.35); transform: translateY(-1px); }
+
+        .btn-danger { background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; }
+        .btn-danger:hover:not(:disabled) { background: #fecaca; box-shadow: 0 2px 8px rgba(220,38,38,0.15); }
+
+        .btn-success { background: #dcfce7; color: #16a34a; border: 1px solid #bbf7d0; }
+        .btn-success:hover:not(:disabled) { background: #bbf7d0; box-shadow: 0 2px 8px rgba(22,163,74,0.15); }
+
+        .btn-warning { background: #fef3c7; color: #d97706; border: 1px solid #fde68a; }
         .btn-warning:hover:not(:disabled) { background: #fde68a; }
-        .btn-ghost { background: #f1f5f9; color: #475569; }
-        .btn-ghost:hover:not(:disabled) { background: #e2e8f0; }
-        .modal-overlay { background: rgba(15,23,42,0.5); backdrop-filter: blur(2px); }
+
+        .btn-ghost { background: rgba(241,245,249,0.9); color: #475569; border: 1px solid rgba(226,232,240,0.8); }
+        .btn-ghost:hover:not(:disabled) { background: #e2e8f0; border-color: #cbd5e1; }
+
+        /* ===== Modal ===== */
+        .modal-overlay {
+            background: rgba(15,23,42,0.5);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+        .modal-box {
+            animation: modalIn 0.3s cubic-bezier(.34,1.56,.64,1);
+        }
+        @keyframes modalIn { from { opacity: 0; transform: scale(0.9) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+
+        /* ===== Log viewer ===== */
         .log-viewer {
-            background: #0f172a; color: #94a3b8; font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
-            font-size: 0.73rem; line-height: 1.65; white-space: pre-wrap; word-break: break-all;
+            background: #0f172a;
+            color: #94a3b8;
+            font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.73rem; line-height: 1.7;
+            white-space: pre-wrap; word-break: break-all;
             height: 62vh; overflow-y: auto; padding: 1rem;
+            border-radius: 0 0 12px 12px;
         }
         .log-viewer::-webkit-scrollbar { width: 6px; }
         .log-viewer::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-        /* Log level colors */
+        .log-viewer::-webkit-scrollbar-thumb:hover { background: #475569; }
+
         .log-line-error   { color: #f87171; }
         .log-line-warning { color: #fbbf24; }
         .log-line-info    { color: #7dd3fc; }
         .log-line-debug   { color: #6b7280; }
         .log-line-default { color: #94a3b8; }
-        /* tail pulse indicator */
+
         @keyframes tail-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
         .tail-active { animation: tail-pulse 1.5s infinite; }
-        /* Log level filter chips */
+
+        /* ===== Log filter chips ===== */
         .log-filter-chip {
             display: inline-flex; align-items: center; gap: 4px;
-            padding: 2px 9px; border-radius: 9999px; font-size: 11px; font-weight: 500;
-            cursor: pointer; border: 1px solid transparent; transition: all 0.15s; line-height: 1.5;
-            user-select: none;
+            padding: 3px 10px; border-radius: 99px; font-size: 11px; font-weight: 600;
+            cursor: pointer; border: 1px solid transparent; transition: all 0.18s;
+            line-height: 1.5; user-select: none;
         }
         .log-filter-chip.all         { color: #64748b; background: #f1f5f9; border-color: #e2e8f0; }
         .log-filter-chip.all.active  { color: #1e293b; background: #e2e8f0; border-color: #cbd5e1; }
         .log-filter-chip.error       { color: #dc2626; background: #fff1f1; border-color: #fecaca; }
-        .log-filter-chip.error.active{ color: #fff; background: #ef4444; border-color: #ef4444; }
+        .log-filter-chip.error.active{ color: #fff; background: #ef4444; border-color: #ef4444; box-shadow: 0 2px 8px rgba(239,68,68,0.3); }
         .log-filter-chip.warning     { color: #b45309; background: #fffbeb; border-color: #fde68a; }
-        .log-filter-chip.warning.active{ color: #fff; background: #f59e0b; border-color: #f59e0b; }
+        .log-filter-chip.warning.active{ color: #fff; background: #f59e0b; border-color: #f59e0b; box-shadow: 0 2px 8px rgba(245,158,11,0.3); }
         .log-filter-chip.info        { color: #0369a1; background: #f0f9ff; border-color: #bae6fd; }
-        .log-filter-chip.info.active { color: #fff; background: #0ea5e9; border-color: #0ea5e9; }
+        .log-filter-chip.info.active { color: #fff; background: #0ea5e9; border-color: #0ea5e9; box-shadow: 0 2px 8px rgba(14,165,233,0.3); }
         .log-filter-chip.debug       { color: #6b7280; background: #f9fafb; border-color: #e5e7eb; }
         .log-filter-chip.debug.active{ color: #fff; background: #9ca3af; border-color: #9ca3af; }
+
+        /* ===== Toast ===== */
         .toast {
-            position: fixed; bottom: 24px; right: 24px; z-index: 100;
-            padding: 0.75rem 1rem; border-radius: 0.75rem; font-size: 0.875rem;
-            box-shadow: 0 10px 30px -5px rgba(0,0,0,0.15);
-            animation: slideIn 0.25s ease-out;
+            position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+            padding: 12px 18px; border-radius: 14px; font-size: 0.875rem; font-weight: 500;
+            box-shadow: 0 12px 40px -8px rgba(0,0,0,0.2);
+            animation: toastIn 0.35s cubic-bezier(.34,1.56,.64,1);
+            display: flex; align-items: center; gap: 8px;
+            max-width: 320px;
         }
-        @keyframes slideIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-        .toast-success { background: #dcfce7; color: #166534; }
-        .toast-error { background: #fee2e2; color: #991b1b; }
+        @keyframes toastIn { from { opacity: 0; transform: translateY(20px) scale(0.9); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        .toast-success { background: linear-gradient(135deg, #dcfce7, #bbf7d0); color: #166534; border: 1px solid #bbf7d0; }
+        .toast-error { background: linear-gradient(135deg, #fee2e2, #fecaca); color: #991b1b; border: 1px solid #fecaca; }
+
+        /* ===== Form inputs ===== */
         input, textarea, select {
-            border: 1px solid #e2e8f0; border-radius: 0.5rem; padding: 0.5rem 0.75rem;
-            width: 100%; outline: none; transition: border-color 0.15s; font-size: 0.875rem;
+            border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 0.5rem 0.75rem;
+            width: 100%; outline: none; transition: all 0.18s; font-size: 0.875rem;
+            background: rgba(255,255,255,0.9);
         }
-        input:focus, textarea:focus, select:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+        input:focus, textarea:focus, select:focus {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+            background: white;
+        }
+        input::placeholder, textarea::placeholder { color: #cbd5e1; }
+
+        /* ===== System cards in manage list ===== */
+        .system-manage-card {
+            background: rgba(255,255,255,0.92);
+            border: 1px solid rgba(226,232,240,0.7);
+            border-radius: 16px;
+            backdrop-filter: blur(8px);
+            transition: all 0.2s ease;
+            position: relative; overflow: hidden;
+        }
+        .system-manage-card::before {
+            content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+            background: linear-gradient(to bottom, transparent, transparent);
+            transition: background 0.3s;
+        }
+        .system-manage-card:hover { box-shadow: 0 4px 20px -8px rgba(0,0,0,0.1); transform: translateY(-1px); }
+        .system-manage-card:hover::before { background: linear-gradient(to bottom, #3b82f6, #6366f1); }
+
+        /* ===== Icon wrap ===== */
+        .sys-icon-wrap {
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 3px 10px -3px rgba(0,0,0,0.2);
+            transition: transform 0.3s cubic-bezier(.34,1.56,.64,1);
+        }
+        .system-manage-card:hover .sys-icon-wrap { transform: scale(1.08) rotate(-3deg); }
+
+        /* ===== Backup card ===== */
+        .backup-card {
+            transition: all 0.2s ease;
+            border-radius: 14px;
+        }
+        .backup-card:hover { box-shadow: 0 4px 20px -8px rgba(0,0,0,0.12); transform: translateY(-1px); }
+
+        /* ===== Section headers ===== */
+        .section-title {
+            font-size: 13px; font-weight: 700; color: #475569;
+            display: flex; align-items: center; gap: 8px;
+            letter-spacing: -0.01em;
+        }
+
+        /* ===== Whitelist table ===== */
+        .whitelist-row {
+            transition: background 0.15s;
+        }
+        .whitelist-row:hover { background: rgba(248,250,252,0.8); }
+
+        /* ===== Scrollbar ===== */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* ===== Toggle switch ===== */
+        .toggle-track {
+            width: 38px; height: 22px; background: #e2e8f0; border-radius: 99px;
+            position: relative; transition: background 0.25s; cursor: pointer;
+        }
+        .toggle-track.on { background: linear-gradient(135deg, #6366f1, #3b82f6); }
+        .toggle-thumb {
+            position: absolute; top: 3px; left: 3px;
+            width: 16px; height: 16px; border-radius: 50%;
+            background: white; box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+            transition: transform 0.25s cubic-bezier(.34,1.56,.64,1);
+        }
+        .toggle-track.on .toggle-thumb { transform: translateX(16px); }
+
+        /* ===== Add button ===== */
+        .header-add-btn {
+            background: linear-gradient(135deg, #3b82f6, #6366f1);
+            color: white; padding: 8px 18px; border-radius: 12px;
+            font-size: 13px; font-weight: 600;
+            box-shadow: 0 4px 14px rgba(59,130,246,0.3);
+            transition: all 0.2s cubic-bezier(.34,1.56,.64,1);
+            display: inline-flex; align-items: center; gap: 6px;
+            border: none; cursor: pointer;
+        }
+        .header-add-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(59,130,246,0.4); }
+        .header-add-btn:active { transform: scale(0.97); }
+
+        /* ===== Empty state ===== */
+        .empty-icon {
+            width: 80px; height: 80px;
+            background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+            border-radius: 24px;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.04);
+        }
+
+        /* ===== Gradient text ===== */
+        .gradient-title {
+            background: linear-gradient(135deg, #334155 0%, #1e40af 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen">
+<body>
     <!-- Header -->
-    <header class="bg-white/80 backdrop-blur-sm border-b border-slate-200/60 sticky top-0 z-10">
+    <header class="site-header">
         <div class="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <a href="/" class="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-600 transition-colors">
-                    <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                <a href="/" class="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-700 transition-colors font-medium group">
+                    <i data-lucide="arrow-left" class="w-4 h-4 transition-transform group-hover:-translate-x-0.5"></i>
                     返回
                 </a>
                 <span class="text-slate-200">|</span>
-                <span class="text-sm font-medium text-slate-700">系统管理</span>
+                <span class="text-sm font-bold gradient-title">系统管理</span>
             </div>
-            <button onclick="openModal()" class="btn btn-primary">
+            <button onclick="openModal()" class="header-add-btn">
                 <i data-lucide="plus" class="w-4 h-4"></i>
                 添加系统
             </button>
@@ -107,12 +273,12 @@
         </div>
 
         <!-- Empty State -->
-        <div id="empty-state" class="hidden text-center py-20">
-            <div class="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <i data-lucide="inbox" class="w-8 h-8 text-slate-300"></i>
+        <div id="empty-state" class="hidden text-center py-24">
+            <div class="empty-icon mb-5">
+                <i data-lucide="inbox" class="w-10 h-10 text-slate-300"></i>
             </div>
-            <p class="text-slate-400 text-sm mb-4">暂无系统</p>
-            <button onclick="openModal()" class="btn btn-primary">
+            <p class="text-slate-400 text-sm mb-5 font-medium">暂无系统</p>
+            <button onclick="openModal()" class="header-add-btn mx-auto">
                 <i data-lucide="plus" class="w-4 h-4"></i>
                 添加第一个系统
             </button>
@@ -122,8 +288,10 @@
     <!-- 备份管理 -->
     <div id="backup-section" class="max-w-5xl mx-auto px-6 pb-8">
         <div class="flex items-center justify-between mb-4">
-            <h3 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                <i data-lucide="archive" class="w-4 h-4"></i>
+            <h3 class="section-title">
+                <div class="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center">
+                    <i data-lucide="archive" class="w-4 h-4 text-slate-500"></i>
+                </div>
                 数据备份
             </h3>
             <button onclick="openWebdavModal()" class="btn btn-ghost text-xs">
@@ -132,26 +300,26 @@
             </button>
         </div>
         <!-- Dashboard 自身 -->
-        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-100 p-4 mb-4">
+        <div class="backup-card bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100/80 p-4 mb-4">
             <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
-                    <div class="w-9 h-9 bg-blue-500 rounded-lg flex items-center justify-center text-white">
+                    <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl flex items-center justify-center text-white shadow-md shadow-blue-200/50">
                         <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
                     </div>
                     <div>
-                        <div class="font-medium text-slate-800 text-sm">Dashboard</div>
-                        <div id="dashboard-backup-info" class="text-xs text-slate-400">从未备份</div>
+                        <div class="font-bold text-slate-800 text-sm">Dashboard</div>
+                        <div id="dashboard-backup-info" class="text-xs text-slate-400 mt-0.5">从未备份</div>
                     </div>
                 </div>
-                <div class="flex items-center gap-1">
+                <div class="flex items-center gap-1.5">
                     <button onclick="manualBackup('dashboard')" class="btn btn-primary text-xs">
                         <i data-lucide="download" class="w-3 h-3"></i>
                         备份
                     </button>
-                    <button onclick="openBackupListModal('dashboard','Dashboard')" class="btn btn-ghost text-xs">
+                    <button onclick="openBackupListModal('dashboard','Dashboard')" class="btn btn-ghost text-xs" title="备份列表">
                         <i data-lucide="list" class="w-3 h-3"></i>
                     </button>
-                    <button onclick="openRestoreModal('dashboard',null,'Dashboard')" class="btn btn-ghost text-xs">
+                    <button onclick="openRestoreModal('dashboard',null,'Dashboard')" class="btn btn-ghost text-xs" title="恢复">
                         <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
                     </button>
                 </div>
@@ -163,40 +331,40 @@
 
     <!-- Edit Modal -->
     <div id="edit-modal" class="fixed inset-0 modal-overlay z-50 hidden items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md fade-in">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md modal-box">
             <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                <h2 id="modal-title" class="text-base font-semibold text-slate-800">添加系统</h2>
-                <button onclick="closeModal()" class="text-slate-300 hover:text-slate-500 transition-colors">
-                    <i data-lucide="x" class="w-5 h-5"></i>
+                <h2 id="modal-title" class="text-base font-bold text-slate-800">添加系统</h2>
+                <button onclick="closeModal()" class="w-8 h-8 rounded-xl flex items-center justify-center text-slate-300 hover:text-slate-600 hover:bg-slate-100 transition-all">
+                    <i data-lucide="x" class="w-4 h-4"></i>
                 </button>
             </div>
             <form id="system-form" class="p-6 space-y-4">
                 <input type="hidden" id="system-id">
                 <div>
-                    <label class="block text-xs font-medium text-slate-500 mb-1">名称 *</label>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">名称 *</label>
                     <input type="text" id="name" required placeholder="系统名称">
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-slate-500 mb-1">地址 *</label>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">地址 *</label>
                     <input type="url" id="url" required placeholder="http://localhost:8080">
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-medium text-slate-500 mb-1">端口</label>
+                        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">端口</label>
                         <input type="number" id="port" placeholder="8080">
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-slate-500 mb-1">服务名称</label>
+                        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">服务名称</label>
                         <input type="text" id="service_name" placeholder="my-service">
                     </div>
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-slate-500 mb-1">描述</label>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">描述</label>
                     <textarea id="description" rows="2" placeholder="简要描述"></textarea>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-medium text-slate-500 mb-1">图标</label>
+                        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">图标</label>
                         <select id="icon" class="bg-white">
                             <option value="box">📦 盒子</option>
                             <option value="printer">🖨️ 打印机</option>
@@ -213,27 +381,27 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-slate-500 mb-1">颜色</label>
-                        <input type="color" id="color" value="#3b82f6" class="h-9 cursor-pointer">
+                        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">颜色</label>
+                        <input type="color" id="color" value="#3b82f6" class="h-10 cursor-pointer rounded-xl" style="padding:2px;">
                     </div>
                 </div>
                 <!-- 备份配置 -->
                 <div class="border-t border-slate-100 pt-4">
                     <div class="flex items-center justify-between mb-3">
-                        <label class="text-xs font-medium text-slate-500">数据库备份</label>
+                        <label class="text-xs font-semibold text-slate-400 uppercase tracking-wide">数据库备份</label>
                         <label class="relative inline-flex items-center cursor-pointer">
                             <input type="checkbox" id="backup_enabled" class="sr-only peer" onchange="toggleBackupConfig(this.checked)">
-                            <div class="w-9 h-5 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+                            <div class="w-9 h-5 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-blue-500 peer-checked:to-indigo-500"></div>
                         </label>
                     </div>
                     <div id="backup-fields" class="space-y-3 hidden">
                         <div>
-                            <label class="block text-xs font-medium text-slate-500 mb-1">数据库路径 *</label>
+                            <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">数据库路径 *</label>
                             <input type="text" id="db_path" placeholder="/home/user/app/data/app.db">
                         </div>
                         <div class="grid grid-cols-2 gap-3">
                             <div>
-                                <label class="block text-xs font-medium text-slate-500 mb-1">备份间隔</label>
+                                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">备份间隔</label>
                                 <select id="backup_interval" class="bg-white">
                                     <option value="daily">每日</option>
                                     <option value="weekly">每周</option>
@@ -241,14 +409,17 @@
                                 </select>
                             </div>
                             <div>
-                                <label class="block text-xs font-medium text-slate-500 mb-1">保留份数</label>
+                                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">保留份数</label>
                                 <input type="number" id="backup_keep" value="3" min="1" max="30">
                             </div>
                         </div>
                     </div>
                 </div>
                 <div class="flex gap-2 pt-2">
-                    <button type="submit" class="btn btn-primary flex-1 justify-center">保存</button>
+                    <button type="submit" class="btn btn-primary flex-1 justify-center">
+                        <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                        保存
+                    </button>
                     <button type="button" onclick="closeModal()" class="btn btn-ghost flex-1 justify-center">取消</button>
                 </div>
             </form>
@@ -258,38 +429,40 @@
     <!-- IP 白名单管理 -->
     <div id="whitelist-section" class="max-w-5xl mx-auto px-6 pb-8 mt-8">
         <div class="flex items-center justify-between mb-4">
-            <h3 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                <i data-lucide="shield-check" class="w-4 h-4"></i>
+            <h3 class="section-title">
+                <div class="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
+                    <i data-lucide="shield-check" class="w-4 h-4 text-emerald-500"></i>
+                </div>
                 IP 告警白名单
             </h3>
             <button onclick="showAddWhitelist()" class="btn btn-success text-xs">
                 <i data-lucide="plus" class="w-3 h-3"></i> 添加
             </button>
         </div>
-        <div class="bg-white rounded-xl border border-slate-200/80 overflow-hidden">
+        <div class="bg-white/90 rounded-2xl border border-slate-200/60 overflow-hidden shadow-sm backdrop-blur-sm">
             <table class="w-full text-sm">
-                <thead class="bg-slate-50 border-b border-slate-200">
+                <thead class="bg-slate-50/80 border-b border-slate-100">
                     <tr>
-                        <th class="text-left px-4 py-2.5 text-xs font-medium text-slate-400">CIDR</th>
-                        <th class="text-left px-4 py-2.5 text-xs font-medium text-slate-400">备注</th>
-                        <th class="w-16 px-4 py-2.5"></th>
+                        <th class="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">CIDR</th>
+                        <th class="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wide">备注</th>
+                        <th class="w-16 px-5 py-3"></th>
                     </tr>
                 </thead>
                 <tbody id="whitelist-tbody">
-                    <tr><td colspan="3" class="px-4 py-6 text-center text-xs text-slate-300">加载中...</td></tr>
+                    <tr><td colspan="3" class="px-5 py-8 text-center text-xs text-slate-300">加载中...</td></tr>
                 </tbody>
             </table>
         </div>
-        <!-- Add form (hidden by default) -->
-        <div id="whitelist-add" class="mt-3 bg-white rounded-xl border border-slate-200/80 p-4 hidden">
+        <!-- Add form -->
+        <div id="whitelist-add" class="mt-3 bg-white/90 rounded-2xl border border-indigo-100 p-4 hidden shadow-sm" style="animation: fadeIn 0.2s ease-out;">
             <div class="flex items-end gap-3">
                 <div class="flex-1">
-                    <label class="block text-xs font-medium text-slate-500 mb-1">CIDR 地址段</label>
-                    <input type="text" id="whitelist-cidr" placeholder="192.168.1.0/24" class="w-full">
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">CIDR 地址段</label>
+                    <input type="text" id="whitelist-cidr" placeholder="192.168.1.0/24">
                 </div>
                 <div class="flex-1">
-                    <label class="block text-xs font-medium text-slate-500 mb-1">备注</label>
-                    <input type="text" id="whitelist-note" placeholder="公司内网" class="w-full">
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">备注</label>
+                    <input type="text" id="whitelist-note" placeholder="公司内网">
                 </div>
                 <button onclick="addWhitelist()" class="btn btn-primary">添加</button>
                 <button onclick="showAddWhitelist()" class="btn btn-ghost">取消</button>
@@ -299,15 +472,18 @@
 
     <!-- Delete Confirm Modal -->
     <div id="delete-modal" class="fixed inset-0 modal-overlay z-50 hidden items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm fade-in">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm modal-box">
             <div class="p-6 text-center">
-                <div class="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <i data-lucide="alert-triangle" class="w-7 h-7 text-red-400"></i>
+                <div class="w-16 h-16 bg-gradient-to-br from-red-50 to-rose-50 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-inner">
+                    <i data-lucide="alert-triangle" class="w-8 h-8 text-red-400"></i>
                 </div>
-                <h3 class="text-base font-semibold text-slate-800 mb-1">确认删除</h3>
-                <p class="text-sm text-slate-400 mb-6">删除 "<span id="delete-name" class="text-slate-600"></span>" 后无法恢复</p>
+                <h3 class="text-base font-bold text-slate-800 mb-1">确认删除</h3>
+                <p class="text-sm text-slate-400 mb-6">删除 "<span id="delete-name" class="text-slate-600 font-semibold"></span>" 后无法恢复</p>
                 <div class="flex gap-2">
-                    <button onclick="confirmDelete()" class="btn btn-danger flex-1 justify-center">删除</button>
+                    <button onclick="confirmDelete()" class="btn btn-danger flex-1 justify-center font-semibold">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        删除
+                    </button>
                     <button onclick="closeDeleteModal()" class="btn btn-ghost flex-1 justify-center">取消</button>
                 </div>
             </div>
@@ -316,41 +492,39 @@
 
     <!-- Log Viewer Modal -->
     <div id="log-modal" class="fixed inset-0 modal-overlay z-50 hidden items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-5xl fade-in flex flex-col" style="max-height:88vh">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl modal-box flex flex-col" style="max-height:88vh">
             <!-- Header -->
             <div class="px-5 py-3.5 border-b border-slate-100 flex items-center gap-3 shrink-0">
-                <i data-lucide="terminal" class="w-4 h-4 text-slate-400"></i>
-                <h2 class="text-sm font-semibold text-slate-800">
+                <div class="w-7 h-7 rounded-lg bg-slate-800 flex items-center justify-center">
+                    <i data-lucide="terminal" class="w-3.5 h-3.5 text-slate-300"></i>
+                </div>
+                <h2 class="text-sm font-bold text-slate-800">
                     日志 · <span id="log-service-name" class="text-slate-400 font-normal"></span>
                 </h2>
-                <!-- Lines selector -->
-                <select id="log-lines" onchange="refreshLogs()" class="ml-2 text-xs bg-slate-100 border-0 rounded px-2 py-1 text-slate-500 cursor-pointer" style="width:auto">
+                <select id="log-lines" onchange="refreshLogs()" class="ml-2 text-xs bg-slate-100 border-0 rounded-lg px-2 py-1.5 text-slate-500 cursor-pointer font-medium" style="width:auto">
                     <option value="50">50 行</option>
                     <option value="100" selected>100 行</option>
                     <option value="200">200 行</option>
                     <option value="500">500 行</option>
                 </select>
-                <!-- Tail toggle -->
-                <button id="tail-btn" onclick="toggleTail()" class="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border transition-all"
+                <button id="tail-btn" onclick="toggleTail()" class="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-all font-medium"
                         style="border-color:#e2e8f0;color:#94a3b8" title="自动跟踪最新日志">
                     <span id="tail-dot" class="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
                     <span id="tail-label">Tail</span>
                 </button>
-                <!-- Clear -->
-                <button onclick="clearLogView()" class="text-xs px-2.5 py-1 rounded-md border border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all" title="清屏">
+                <button onclick="clearLogView()" class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all font-medium" title="清屏">
                     <i data-lucide="eraser" class="w-3.5 h-3.5 inline -mt-0.5"></i> 清屏
                 </button>
-                <!-- Refresh -->
-                <button onclick="refreshLogs()" class="text-xs px-2.5 py-1 rounded-md border border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all">
+                <button onclick="refreshLogs()" class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-all font-medium">
                     <i data-lucide="refresh-cw" class="w-3.5 h-3.5 inline -mt-0.5"></i> 刷新
                 </button>
-                <button onclick="closeLogModal()" class="ml-auto text-slate-300 hover:text-slate-500 transition-colors p-1">
-                    <i data-lucide="x" class="w-5 h-5"></i>
+                <button onclick="closeLogModal()" class="ml-auto w-8 h-8 rounded-xl flex items-center justify-center text-slate-300 hover:text-slate-600 hover:bg-slate-100 transition-all">
+                    <i data-lucide="x" class="w-4 h-4"></i>
                 </button>
             </div>
             <!-- Level filter chips -->
-            <div class="px-5 py-2 border-b border-slate-100 flex items-center gap-2 shrink-0 flex-wrap">
-                <span class="text-[10px] text-slate-400 font-medium uppercase tracking-wide mr-1">过滤</span>
+            <div class="px-5 py-2.5 border-b border-slate-100 flex items-center gap-2 shrink-0 flex-wrap bg-slate-50/50">
+                <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mr-1">过滤</span>
                 <button class="log-filter-chip all active" data-level="all" onclick="setLogFilter('all')">全部</button>
                 <button class="log-filter-chip error" data-level="error" onclick="setLogFilter('error')">
                     <span class="w-1.5 h-1.5 rounded-full bg-current inline-block"></span>ERROR
@@ -368,10 +542,10 @@
                     <span class="w-1.5 h-1.5 rounded-full bg-current inline-block"></span>DEBUG
                     <span id="log-count-debug" class="text-[9px] opacity-60"></span>
                 </button>
-                <span id="log-match-hint" class="ml-auto text-[10px] text-slate-300"></span>
+                <span id="log-match-hint" class="ml-auto text-[10px] text-slate-300 font-medium"></span>
             </div>
             <!-- Log content -->
-            <div id="log-content" class="log-viewer rounded-b-xl flex-1 overflow-y-auto">
+            <div id="log-content" class="log-viewer flex-1 overflow-y-auto">
                 <span class="log-line-debug">加载中...</span>
             </div>
         </div>
@@ -379,20 +553,18 @@
 
     <!-- Backup List Modal -->
     <div id="backup-list-modal" class="fixed inset-0 modal-overlay z-50 hidden items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-xl fade-in flex flex-col max-h-[85vh]">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl modal-box flex flex-col max-h-[85vh]">
             <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
-                <h2 class="text-base font-semibold text-slate-800" id="backup-list-title">备份列表</h2>
+                <h2 class="text-base font-bold text-slate-800" id="backup-list-title">备份列表</h2>
                 <div class="flex items-center gap-2">
                     <button onclick="loadBackupList()" class="btn btn-ghost text-xs" title="刷新"><i data-lucide="refresh-cw" class="w-3 h-3"></i></button>
-                    <button onclick="closeBackupListModal()" class="text-slate-300 hover:text-slate-500"><i data-lucide="x" class="w-5 h-5"></i></button>
+                    <button onclick="closeBackupListModal()" class="w-8 h-8 rounded-xl flex items-center justify-center text-slate-300 hover:text-slate-600 hover:bg-slate-100 transition-all"><i data-lucide="x" class="w-4 h-4"></i></button>
                 </div>
             </div>
             <div class="px-6 pt-4 pb-6 overflow-y-auto flex-1">
-                <!-- 本地备份 -->
-                <div class="text-xs font-medium text-slate-400 mb-2">本地备份</div>
+                <div class="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">本地备份</div>
                 <div id="backup-list-content" class="space-y-2 mb-4"></div>
-                <!-- 云端备份 -->
-                <div class="text-xs font-medium text-slate-400 mb-2 flex items-center gap-1"><i data-lucide="cloud" class="w-3 h-3"></i> 云端备份</div>
+                <div class="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2 flex items-center gap-1.5"><i data-lucide="cloud" class="w-3 h-3"></i> 云端备份</div>
                 <div id="backup-cloud-content" class="space-y-2"></div>
             </div>
         </div>
@@ -400,31 +572,36 @@
 
     <!-- WebDAV Modal -->
     <div id="webdav-modal" class="fixed inset-0 modal-overlay z-50 hidden items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md fade-in">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md modal-box">
             <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                <h2 class="text-base font-semibold text-slate-800 flex items-center gap-2">
-                    <i data-lucide="cloud" class="w-4 h-4"></i> 坚果云 WebDAV
+                <h2 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                    <div class="w-7 h-7 rounded-lg bg-sky-50 flex items-center justify-center">
+                        <i data-lucide="cloud" class="w-4 h-4 text-sky-500"></i>
+                    </div>
+                    坚果云 WebDAV
                 </h2>
-                <button onclick="closeWebdavModal()" class="text-slate-300 hover:text-slate-500"><i data-lucide="x" class="w-5 h-5"></i></button>
+                <button onclick="closeWebdavModal()" class="w-8 h-8 rounded-xl flex items-center justify-center text-slate-300 hover:text-slate-600 hover:bg-slate-100 transition-all"><i data-lucide="x" class="w-4 h-4"></i></button>
             </div>
             <form id="webdav-form" class="p-6 space-y-4">
                 <div>
-                    <label class="block text-xs font-medium text-slate-500 mb-1">WebDAV 地址</label>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">WebDAV 地址</label>
                     <input type="url" id="webdav_url" placeholder="https://dav.jianguoyun.com/dav/">
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-slate-500 mb-1">用户名</label>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">用户名</label>
                     <input type="text" id="webdav_username" placeholder="your@email.com">
                 </div>
                 <div>
-                    <label class="block text-xs font-medium text-slate-500 mb-1">应用密码</label>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">应用密码</label>
                     <input type="password" id="webdav_password" placeholder="坚果云安全设置中的应用密码">
                 </div>
                 <div class="flex gap-2">
                     <button type="button" onclick="checkWebdav()" class="btn btn-ghost flex-1 justify-center">
                         <i data-lucide="wifi" class="w-3.5 h-3.5"></i> 测试连接
                     </button>
-                    <button type="submit" class="btn btn-primary flex-1 justify-center">保存</button>
+                    <button type="submit" class="btn btn-primary flex-1 justify-center">
+                        <i data-lucide="check" class="w-3.5 h-3.5"></i> 保存
+                    </button>
                 </div>
             </form>
         </div>
@@ -432,17 +609,18 @@
 
     <!-- Restore Modal -->
     <div id="restore-modal" class="fixed inset-0 modal-overlay z-50 hidden items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg fade-in">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg modal-box">
             <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                <h2 class="text-base font-semibold text-slate-800" id="restore-title">恢复备份</h2>
-                <button onclick="closeRestoreModal()" class="text-slate-300 hover:text-slate-500"><i data-lucide="x" class="w-5 h-5"></i></button>
+                <h2 class="text-base font-bold text-slate-800" id="restore-title">恢复备份</h2>
+                <button onclick="closeRestoreModal()" class="w-8 h-8 rounded-xl flex items-center justify-center text-slate-300 hover:text-slate-600 hover:bg-slate-100 transition-all"><i data-lucide="x" class="w-4 h-4"></i></button>
             </div>
             <div class="p-6">
                 <div class="mb-4">
-                    <label class="block text-xs font-medium text-slate-500 mb-2">选择备份文件</label>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">选择备份文件</label>
                     <select id="restore-select" class="bg-white"><option value="">加载中...</option></select>
                 </div>
-                <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700 mb-4">
+                <div class="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200/60 rounded-xl p-3 text-xs text-amber-700 mb-4 flex items-start gap-2">
+                    <i data-lucide="info" class="w-3.5 h-3.5 mt-0.5 flex-shrink-0"></i>
                     恢复前将自动备份当前版本为 pre_restore_ 文件
                 </div>
                 <div class="flex gap-2">
@@ -459,7 +637,7 @@
         let systems = [];
         let deleteId = null;
         let logSystemId = null;
-        let currentBackupSystem = null;  // {type:'system'|'dashboard', id, name}
+        let currentBackupSystem = null;
         let currentRestoreSystem = null;
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -480,77 +658,47 @@
         function renderList() {
             const list = document.getElementById('systems-list');
             const empty = document.getElementById('empty-state');
-
-            if (systems.length === 0) {
-                list.innerHTML = '';
-                empty.classList.remove('hidden');
-                lucide.createIcons();
-                return;
-            }
-
+            if (systems.length === 0) { list.innerHTML = ''; empty.classList.remove('hidden'); lucide.createIcons(); return; }
             empty.classList.add('hidden');
-            list.innerHTML = systems.map(s => `
-                <div class="bg-white rounded-xl border border-slate-200/80 p-4 fade-in" id="system-${s.id}">
+            list.innerHTML = systems.map((s, i) => `
+                <div class="system-manage-card p-4 fade-in" id="system-${s.id}" style="animation-delay:${i*0.04}s">
                     <div class="flex items-start gap-4">
-                        <!-- Icon -->
-                        <div class="w-10 h-10 rounded-lg flex items-center justify-center text-white flex-shrink-0"
-                             style="background: ${s.color}">
+                        <div class="sys-icon-wrap w-11 h-11 flex-shrink-0" style="background: linear-gradient(135deg, ${s.color}, ${s.color}cc); color:white">
                             <i data-lucide="${s.icon}" class="w-5 h-5"></i>
                         </div>
-
-                        <!-- Info -->
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-2">
-                                <h3 class="font-semibold text-slate-800 text-sm">${s.name}</h3>
-                                <span class="status-dot ${s.online ? 'status-online' : 'status-offline'}"
-                                      id="status-${s.id}"></span>
+                                <h3 class="font-bold text-slate-800 text-sm">${s.name}</h3>
+                                <span class="status-dot ${s.online ? 'status-online' : 'status-offline'}" id="status-${s.id}"></span>
                             </div>
-                            <p class="text-xs text-slate-400 mt-0.5 truncate">${s.url}</p>
-                            ${s.description ? `<p class="text-xs text-slate-400 mt-0.5">${s.description}</p>` : ''}
+                            <p class="text-xs text-slate-400 mt-0.5 truncate font-mono">${s.url}</p>
+                            ${s.description ? `<p class="text-xs text-slate-500 mt-0.5">${s.description}</p>` : ''}
                             ${s.service_name ? `
                                 <div class="flex items-center gap-3 mt-2 text-xs text-slate-400">
-                                    <span class="flex items-center gap-1">
+                                    <span class="flex items-center gap-1 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100">
                                         <i data-lucide="cpu" class="w-3 h-3"></i> ${s.service_name}
                                     </span>
-                                    ${s.port ? `<span>端口 ${s.port}</span>` : ''}
+                                    ${s.port ? `<span class="text-slate-400">端口 <span class="font-mono font-semibold">${s.port}</span></span>` : ''}
                                 </div>
-                            ` : (s.port ? `
-                                <div class="mt-2 text-xs text-slate-400">端口 ${s.port}</div>
-                            ` : '')}
+                            ` : (s.port ? `<div class="mt-2 text-xs text-slate-400">端口 <span class="font-mono font-semibold">${s.port}</span></div>` : '')}
                         </div>
-
-                        <!-- Actions -->
                         <div class="flex items-center gap-1 flex-shrink-0">
                             ${s.service_name ? `
-                                <button onclick="serviceAction(${s.id}, 'start')" class="btn btn-success" title="启动">
-                                    <i data-lucide="play" class="w-3.5 h-3.5"></i>
-                                </button>
-                                <button onclick="serviceAction(${s.id}, 'stop')" class="btn btn-warning" title="停止">
-                                    <i data-lucide="square" class="w-3.5 h-3.5"></i>
-                                </button>
-                                <button onclick="serviceAction(${s.id}, 'restart')" class="btn btn-primary" title="重启">
-                                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-                                </button>
-                                <button onclick="openLogModal(${s.id})" class="btn btn-ghost" title="日志">
-                                    <i data-lucide="terminal" class="w-3.5 h-3.5"></i>
-                                </button>
-                                <span class="w-px h-5 bg-slate-100 mx-1"></span>
+                                <button onclick="serviceAction(${s.id}, 'start')" class="btn btn-success" title="启动"><i data-lucide="play" class="w-3.5 h-3.5"></i></button>
+                                <button onclick="serviceAction(${s.id}, 'stop')" class="btn btn-warning" title="停止"><i data-lucide="square" class="w-3.5 h-3.5"></i></button>
+                                <button onclick="serviceAction(${s.id}, 'restart')" class="btn btn-primary" title="重启"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i></button>
+                                <button onclick="openLogModal(${s.id})" class="btn btn-ghost" title="日志"><i data-lucide="terminal" class="w-3.5 h-3.5"></i></button>
+                                <span class="w-px h-5 bg-slate-100 mx-0.5"></span>
                             ` : ''}
-                            <button onclick="editSystem(${s.id})" class="btn btn-ghost" title="编辑">
-                                <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
-                            </button>
-                            <button onclick="openDeleteModal(${s.id})" class="btn btn-danger" title="删除">
-                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                            </button>
+                            <button onclick="editSystem(${s.id})" class="btn btn-ghost" title="编辑"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
+                            <button onclick="openDeleteModal(${s.id})" class="btn btn-danger" title="删除"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
                         </div>
                     </div>
                 </div>
             `).join('');
-
             lucide.createIcons();
         }
 
-        // Status
         async function checkAllStatus() {
             const promises = systems.map(async s => {
                 const dot = document.getElementById(`status-${s.id}`);
@@ -560,15 +708,11 @@
                     const data = await res.json();
                     s.online = data.online;
                     if (dot) dot.className = `status-dot ${data.online ? 'status-online' : 'status-offline'}`;
-                } catch {
-                    s.online = false;
-                    if (dot) dot.className = 'status-dot status-offline';
-                }
+                } catch { s.online = false; if (dot) dot.className = 'status-dot status-offline'; }
             });
             await Promise.all(promises);
         }
 
-        // Modal CRUD
         function openModal(system = null) {
             document.getElementById('edit-modal').classList.remove('hidden');
             document.getElementById('edit-modal').classList.add('flex');
@@ -587,7 +731,7 @@
             document.getElementById('backup_keep').value = system?.backup_keep || 3;
             toggleBackupConfig(system?.backup_enabled == 1);
             lucide.createIcons();
-            document.getElementById('name').focus();
+            setTimeout(() => document.getElementById('name').focus(), 100);
         }
 
         function closeModal() {
@@ -595,10 +739,7 @@
             document.getElementById('edit-modal').classList.remove('flex');
         }
 
-        function editSystem(id) {
-            const s = systems.find(x => x.id === id);
-            if (s) openModal(s);
-        }
+        function editSystem(id) { const s = systems.find(x => x.id === id); if (s) openModal(s); }
 
         document.getElementById('system-form').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -616,22 +757,13 @@
                 backup_interval: document.getElementById('backup_interval').value || 'daily',
                 backup_keep: parseInt(document.getElementById('backup_keep').value) || 3
             };
-
             const url = id ? `/api/systems/${id}` : '/api/systems';
             const method = id ? 'PUT' : 'POST';
             const res = await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
-
-            if (res.ok) {
-                closeModal();
-                loadSystems();
-                showToast(id ? '系统已更新' : '系统已添加', 'success');
-            } else {
-                const err = await res.json();
-                showToast(err.error || '操作失败', 'error');
-            }
+            if (res.ok) { closeModal(); loadSystems(); showToast(id ? '✓ 系统已更新' : '✓ 系统已添加', 'success'); }
+            else { const err = await res.json(); showToast('✗ ' + (err.error || '操作失败'), 'error'); }
         });
 
-        // Delete
         function openDeleteModal(id) {
             deleteId = id;
             const s = systems.find(x => x.id === id);
@@ -649,45 +781,29 @@
         async function confirmDelete() {
             if (!deleteId) return;
             const res = await fetch(`/api/systems/${deleteId}`, { method: 'DELETE' });
-            if (res.ok) {
-                closeDeleteModal();
-                loadSystems();
-                showToast('系统已删除', 'success');
-            }
+            if (res.ok) { closeDeleteModal(); loadSystems(); showToast('✓ 系统已删除', 'success'); }
         }
 
-        // Service Control
         const actionLabel = { start: '启动', stop: '停止', restart: '重启' };
 
         async function serviceAction(id, action) {
             const s = systems.find(x => x.id === id);
             if (!s) return;
-
-            // 确认
             const confirmed = confirm(`确认${actionLabel[action]} "${s.name}" 服务？`);
             if (!confirmed) return;
-
             try {
                 const res = await fetch(`/api/systems/${id}/service/${action}`, { method: 'POST' });
                 const data = await res.json();
-                if (data.ok) {
-                    showToast(data.message, 'success');
-                    // 等待后刷新状态
-                    setTimeout(() => checkAllStatus(), 1000);
-                    setTimeout(() => checkAllStatus(), 3000);
-                } else {
-                    showToast(data.message || '操作失败', 'error');
-                }
-            } catch (e) {
-                showToast('请求失败', 'error');
-            }
+                if (data.ok) { showToast('✓ ' + data.message, 'success'); setTimeout(() => checkAllStatus(), 1000); setTimeout(() => checkAllStatus(), 3000); }
+                else showToast('✗ ' + (data.message || '操作失败'), 'error');
+            } catch { showToast('✗ 请求失败', 'error'); }
         }
 
         // ===== Logs =====
         let tailInterval = null;
         let tailEnabled = false;
-        let currentLogRaw = '';       // raw log text cached for re-filtering
-        let currentLogFilter = 'all'; // active level filter
+        let currentLogRaw = '';
+        let currentLogFilter = 'all';
 
         function openLogModal(id) {
             logSystemId = id;
@@ -695,39 +811,24 @@
             document.getElementById('log-service-name').textContent = s?.service_name || '';
             document.getElementById('log-modal').classList.remove('hidden');
             document.getElementById('log-modal').classList.add('flex');
-            // Reset tail state & filter
-            tailEnabled = false;
-            currentLogFilter = 'all';
-            _updateTailUI();
-            _updateFilterChips();
-            refreshLogs();
+            tailEnabled = false; currentLogFilter = 'all';
+            _updateTailUI(); _updateFilterChips(); refreshLogs();
         }
 
         function closeLogModal() {
-            logSystemId = null;
-            tailEnabled = false;
+            logSystemId = null; tailEnabled = false;
             if (tailInterval) { clearInterval(tailInterval); tailInterval = null; }
-            _updateTailUI();
-            currentLogRaw = '';
-            currentLogFilter = 'all';
+            _updateTailUI(); currentLogRaw = ''; currentLogFilter = 'all';
             document.getElementById('log-modal').classList.add('hidden');
             document.getElementById('log-modal').classList.remove('flex');
         }
 
-        function clearLogView() {
-            const el = document.getElementById('log-content');
-            el.innerHTML = '<span class="log-line-debug">-- 已清屏 --</span>';
-        }
+        function clearLogView() { document.getElementById('log-content').innerHTML = '<span class="log-line-debug">-- 已清屏 --</span>'; }
 
         function toggleTail() {
-            tailEnabled = !tailEnabled;
-            _updateTailUI();
-            if (tailEnabled) {
-                refreshLogs();
-                tailInterval = setInterval(refreshLogs, 5000);
-            } else {
-                if (tailInterval) { clearInterval(tailInterval); tailInterval = null; }
-            }
+            tailEnabled = !tailEnabled; _updateTailUI();
+            if (tailEnabled) { refreshLogs(); tailInterval = setInterval(refreshLogs, 5000); }
+            else { if (tailInterval) { clearInterval(tailInterval); tailInterval = null; } }
         }
 
         function _updateTailUI() {
@@ -735,33 +836,20 @@
             const dot = document.getElementById('tail-dot');
             const label = document.getElementById('tail-label');
             if (tailEnabled) {
-                btn.style.borderColor = '#22c55e';
-                btn.style.color = '#16a34a';
-                btn.style.background = '#f0fdf4';
-                dot.className = 'w-1.5 h-1.5 rounded-full bg-green-500 tail-active';
-                label.textContent = 'Tail 开';
+                btn.style.borderColor = '#22c55e'; btn.style.color = '#16a34a'; btn.style.background = '#f0fdf4';
+                dot.className = 'w-1.5 h-1.5 rounded-full bg-green-500 tail-active'; label.textContent = 'Tail 开';
             } else {
-                btn.style.borderColor = '#e2e8f0';
-                btn.style.color = '#94a3b8';
-                btn.style.background = '';
-                dot.className = 'w-1.5 h-1.5 rounded-full bg-slate-300';
-                label.textContent = 'Tail';
+                btn.style.borderColor = '#e2e8f0'; btn.style.color = '#94a3b8'; btn.style.background = '';
+                dot.className = 'w-1.5 h-1.5 rounded-full bg-slate-300'; label.textContent = 'Tail';
             }
         }
 
-        function setLogFilter(level) {
-            currentLogFilter = level;
-            _updateFilterChips();
-            _applyLogFilter();
-        }
+        function setLogFilter(level) { currentLogFilter = level; _updateFilterChips(); _applyLogFilter(); }
 
         function _updateFilterChips() {
-            document.querySelectorAll('.log-filter-chip').forEach(chip => {
-                chip.classList.toggle('active', chip.dataset.level === currentLogFilter);
-            });
+            document.querySelectorAll('.log-filter-chip').forEach(chip => chip.classList.toggle('active', chip.dataset.level === currentLogFilter));
         }
 
-        // Classify a single log line → level key
         function _classifyLine(line) {
             const upper = line.toUpperCase();
             if (/\b(ERROR|CRITICAL|FATAL|ERR\b|TRACEBACK|EXCEPTION)\b/.test(upper)) return 'error';
@@ -775,121 +863,56 @@
             const el = document.getElementById('log-content');
             if (!currentLogRaw) return;
             const lines = currentLogRaw.split('\n');
-
-            // Count each level
             const counts = { error: 0, warning: 0, info: 0, debug: 0 };
-            for (const line of lines) {
-                const lvl = _classifyLine(line);
-                if (counts[lvl] !== undefined) counts[lvl]++;
-            }
-            ['error', 'warning', 'info', 'debug'].forEach(lvl => {
-                const badge = document.getElementById(`log-count-${lvl}`);
-                if (badge) badge.textContent = counts[lvl] > 0 ? counts[lvl] : '';
-            });
-
-            // Filter & render
+            for (const line of lines) { const lvl = _classifyLine(line); if (counts[lvl] !== undefined) counts[lvl]++; }
+            ['error', 'warning', 'info', 'debug'].forEach(lvl => { const badge = document.getElementById(`log-count-${lvl}`); if (badge) badge.textContent = counts[lvl] > 0 ? counts[lvl] : ''; });
             let filtered = lines;
-            if (currentLogFilter !== 'all') {
-                filtered = lines.filter(line => {
-                    const lvl = _classifyLine(line);
-                    return currentLogFilter === 'debug'
-                        ? (lvl === 'debug' || lvl === 'default')  // debug also shows unclassified
-                        : lvl === currentLogFilter;
-                });
-            }
-
+            if (currentLogFilter !== 'all') filtered = lines.filter(line => { const lvl = _classifyLine(line); return currentLogFilter === 'debug' ? (lvl === 'debug' || lvl === 'default') : lvl === currentLogFilter; });
             const hint = document.getElementById('log-match-hint');
-            if (currentLogFilter !== 'all') {
-                hint.textContent = `${filtered.length} / ${lines.length} 行`;
-            } else {
-                hint.textContent = '';
-            }
-
-            el.innerHTML = filtered.length === 0
-                ? `<span class="log-line-debug">-- 当前级别无匹配日志 --</span>`
+            hint.textContent = currentLogFilter !== 'all' ? `${filtered.length} / ${lines.length} 行` : '';
+            el.innerHTML = filtered.length === 0 ? `<span class="log-line-debug">-- 当前级别无匹配日志 --</span>`
                 : filtered.map(line => {
                     const lvl = _classifyLine(line);
-                    const cls = lvl === 'error' ? 'log-line-error'
-                              : lvl === 'warning' ? 'log-line-warning'
-                              : lvl === 'info' ? 'log-line-info'
-                              : lvl === 'debug' ? 'log-line-debug'
-                              : 'log-line-default';
-                    const escaped = line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-                    return `<span class="${cls}">${escaped}</span>`;
+                    const cls = { error:'log-line-error', warning:'log-line-warning', info:'log-line-info', debug:'log-line-debug', default:'log-line-default' }[lvl];
+                    return `<span class="${cls}">${line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>`;
                 }).join('\n');
-
             el.scrollTop = el.scrollHeight;
-        }
-
-        function _colorizeLog(raw) {
-            // Colorize each line based on log level — delegates to _classifyLine
-            if (!raw) return '<span class="log-line-debug">(无日志)</span>';
-            return raw.split('\n').map(line => {
-                const lvl = _classifyLine(line);
-                const cls = lvl === 'error' ? 'log-line-error'
-                          : lvl === 'warning' ? 'log-line-warning'
-                          : lvl === 'info' ? 'log-line-info'
-                          : lvl === 'debug' ? 'log-line-debug'
-                          : 'log-line-default';
-                const escaped = line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-                return `<span class="${cls}">${escaped}</span>`;
-            }).join('\n');
         }
 
         async function refreshLogs() {
             if (!logSystemId) return;
             const el = document.getElementById('log-content');
             const lines = document.getElementById('log-lines')?.value || 100;
-            // Don't reset content while tail is active (just append/replace silently)
-            if (!tailEnabled) {
-                el.innerHTML = '<span class="log-line-debug">加载中...</span>';
-            }
+            if (!tailEnabled) el.innerHTML = '<span class="log-line-debug">加载中...</span>';
             try {
                 const res = await fetch(`/api/systems/${logSystemId}/logs?lines=${lines}`);
                 const data = await res.json();
-                if (data.logs !== undefined) {
-                    currentLogRaw = data.logs;
-                    _applyLogFilter();
-                } else {
-                    currentLogRaw = '';
-                    el.innerHTML = `<span class="log-line-error">${(data.error || '加载失败').replace(/</g,'&lt;')}</span>`;
-                }
-            } catch {
-                el.innerHTML = '<span class="log-line-error">请求失败</span>';
-            }
+                if (data.logs !== undefined) { currentLogRaw = data.logs; _applyLogFilter(); }
+                else { currentLogRaw = ''; el.innerHTML = `<span class="log-line-error">${(data.error || '加载失败').replace(/</g,'&lt;')}</span>`; }
+            } catch { el.innerHTML = '<span class="log-line-error">请求失败</span>'; }
             lucide.createIcons();
         }
 
-        // Toast
+        // ===== Toast =====
         function showToast(msg, type = 'success') {
             const el = document.createElement('div');
             el.className = `toast toast-${type}`;
-            el.textContent = msg;
+            el.innerHTML = msg;
             document.body.appendChild(el);
             setTimeout(() => {
-                el.style.opacity = '0';
-                el.style.transition = 'opacity 0.3s';
+                el.style.opacity = '0'; el.style.transform = 'translateY(12px) scale(0.95)';
+                el.style.transition = 'all 0.3s ease-in';
                 setTimeout(() => el.remove(), 300);
             }, 2500);
         }
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                closeModal();
-                closeDeleteModal();
-                closeLogModal();   // also stops tail
-                closeBackupListModal();
-                closeWebdavModal();
-                closeRestoreModal();
-            }
+            if (e.key === 'Escape') { closeModal(); closeDeleteModal(); closeLogModal(); closeBackupListModal(); closeWebdavModal(); closeRestoreModal(); }
         });
 
-        // ==================== 备份管理 JS ====================
-
-        function toggleBackupConfig(enabled) {
-            document.getElementById('backup-fields').classList.toggle('hidden', !enabled);
-        }
+        // ===== Backup =====
+        function toggleBackupConfig(enabled) { document.getElementById('backup-fields').classList.toggle('hidden', !enabled); }
 
         function formatFileSize(bytes) {
             if (!bytes) return '0 B';
@@ -904,39 +927,29 @@
         }
 
         async function loadBackupSystems() {
-            // 加载 Dashboard 上次备份信息
             try {
                 const res = await fetch('/api/backup/list/dashboard');
                 const backups = await res.json();
                 const info = document.getElementById('dashboard-backup-info');
-                if (backups.length > 0) {
-                    info.textContent = '上次: ' + formatDateTime(backups[0].created_at) + ' · ' + formatFileSize(backups[0].file_size);
-                } else {
-                    info.textContent = '从未备份';
-                }
+                info.textContent = backups.length > 0 ? '上次: ' + formatDateTime(backups[0].created_at) + ' · ' + formatFileSize(backups[0].file_size) : '从未备份';
             } catch {}
-
-            // 渲染各系统备份卡片
             const list = document.getElementById('backup-systems-list');
             const res2 = await fetch('/api/systems');
             const allSystems = await res2.json();
             const backupSystems = allSystems.filter(s => s.db_path);
-
             if (backupSystems.length === 0) {
-                list.innerHTML = '<div class="text-center py-8 text-slate-400 text-sm col-span-2">暂无配置备份的系统<br><span class="text-xs">编辑系统 → 开启备份并填写数据库路径</span></div>';
-                lucide.createIcons();
-                return;
+                list.innerHTML = '<div class="text-center py-8 text-slate-400 text-sm col-span-2">暂无配置备份的系统<br><span class="text-xs text-slate-300">编辑系统 → 开启备份并填写数据库路径</span></div>';
+                lucide.createIcons(); return;
             }
-
             list.innerHTML = backupSystems.map(s => `
-                <div class="bg-white rounded-xl border border-slate-200/80 p-4">
+                <div class="backup-card bg-white/90 border border-slate-200/60 p-4">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-lg flex items-center justify-center text-white" style="background:${s.color}">
+                            <div class="sys-icon-wrap w-9 h-9" style="background:linear-gradient(135deg,${s.color},${s.color}cc);color:white">
                                 <i data-lucide="${s.icon}" class="w-4 h-4"></i>
                             </div>
                             <div>
-                                <div class="font-medium text-slate-800 text-sm">${s.name}</div>
+                                <div class="font-bold text-slate-800 text-sm">${s.name}</div>
                                 <div class="text-xs text-slate-400">${s.last_backup ? '上次: '+formatDateTime(s.last_backup) : '从未备份'}</div>
                             </div>
                         </div>
@@ -956,12 +969,11 @@
             try {
                 const res = await fetch(endpoint, {method:'POST'});
                 const data = await res.json();
-                showToast(data.ok ? `备份成功: ${data.filename}` : (data.error || '备份失败'), data.ok ? 'success' : 'error');
+                showToast(data.ok ? `✓ 备份成功: ${data.filename}` : ('✗ ' + (data.error || '备份失败')), data.ok ? 'success' : 'error');
                 if (data.ok) loadBackupSystems();
-            } catch { showToast('备份请求失败', 'error'); }
+            } catch { showToast('✗ 备份请求失败', 'error'); }
         }
 
-        // 备份列表弹窗
         function openBackupListModal(id, name) {
             currentBackupSystem = { type: id === 'dashboard' ? 'dashboard' : 'system', id, name };
             document.getElementById('backup-list-title').textContent = name + ' - 备份列表';
@@ -969,30 +981,25 @@
             document.getElementById('backup-list-modal').classList.add('flex');
             loadBackupList();
         }
-        function closeBackupListModal() {
-            document.getElementById('backup-list-modal').classList.add('hidden');
-            document.getElementById('backup-list-modal').classList.remove('flex');
-        }
+        function closeBackupListModal() { document.getElementById('backup-list-modal').classList.add('hidden'); document.getElementById('backup-list-modal').classList.remove('flex'); }
+
         async function loadBackupList() {
             if (!currentBackupSystem) return;
             const endpoint = currentBackupSystem.type === 'dashboard' ? '/api/backup/list/dashboard' : `/api/backup/list/${currentBackupSystem.id}`;
             const localEl = document.getElementById('backup-list-content');
             const cloudEl = document.getElementById('backup-cloud-content');
-
-            // 加载本地备份
             try {
                 const res = await fetch(endpoint);
                 const backups = await res.json();
-                if (backups.length === 0) {
-                    localEl.innerHTML = '<div class="text-center py-4 text-slate-300 text-xs">暂无本地备份</div>';
-                } else {
+                if (backups.length === 0) { localEl.innerHTML = '<div class="text-center py-4 text-slate-300 text-xs">暂无本地备份</div>'; }
+                else {
                     localEl.innerHTML = backups.map(b => `
-                        <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg text-sm">
+                        <div class="flex items-center justify-between p-3 bg-slate-50/80 rounded-xl text-sm border border-slate-100 hover:bg-slate-100/80 transition-colors">
                             <div class="flex items-center gap-2 min-w-0">
                                 <i data-lucide="hard-drive" class="w-3.5 h-3.5 text-slate-400 shrink-0"></i>
                                 <div class="min-w-0">
-                                    <div class="font-mono text-slate-600 text-xs truncate">${b.backup_file}</div>
-                                    <div class="text-xs text-slate-400">${formatFileSize(b.file_size)} · ${formatDateTime(b.created_at)}${b.backup_type==='auto' ? ' <span class="text-blue-400">自动</span>' : ''}</div>
+                                    <div class="font-mono text-slate-600 text-xs truncate font-medium">${b.backup_file}</div>
+                                    <div class="text-xs text-slate-400">${formatFileSize(b.file_size)} · ${formatDateTime(b.created_at)}${b.backup_type==='auto' ? ' <span class="text-blue-400 font-medium">自动</span>' : ''}</div>
                                 </div>
                             </div>
                             <div class="flex items-center gap-1 shrink-0">
@@ -1004,31 +1011,25 @@
                 }
             } catch { localEl.innerHTML = '<div class="text-center py-4 text-red-400 text-xs">加载失败</div>'; }
 
-            // 加载云端备份
-            cloudEl.innerHTML = '<div class="text-center py-4 text-slate-300 text-xs"><i data-lucide="loader" class="w-3 h-3 animate-spin inline"></i> 加载中...</div>';
+            cloudEl.innerHTML = '<div class="text-center py-4 text-slate-300 text-xs flex items-center justify-center gap-2"><i data-lucide="loader" class="w-3 h-3 animate-spin"></i> 加载中...</div>';
             try {
                 const sid = currentBackupSystem.type === 'dashboard' ? '' : currentBackupSystem.id;
                 const res2 = await fetch('/api/webdav/list' + (sid ? '?system_id=' + sid : ''));
                 const data = await res2.json();
-                if (!data.ok) {
-                    cloudEl.innerHTML = '<div class="text-center py-4 text-slate-300 text-xs">无法连接云端</div>';
-                } else if (data.files.length === 0) {
-                    cloudEl.innerHTML = '<div class="text-center py-4 text-slate-300 text-xs">暂无云端备份</div>';
-                } else {
+                if (!data.ok) { cloudEl.innerHTML = '<div class="text-center py-4 text-slate-300 text-xs">无法连接云端</div>'; }
+                else if (data.files.length === 0) { cloudEl.innerHTML = '<div class="text-center py-4 text-slate-300 text-xs">暂无云端备份</div>'; }
+                else {
                     cloudEl.innerHTML = data.files.map(f => `
-                        <div class="flex items-center justify-between p-2.5 bg-blue-50 rounded-lg text-sm">
+                        <div class="flex items-center justify-between p-3 bg-sky-50/80 rounded-xl text-sm border border-sky-100/80 hover:bg-sky-100/50 transition-colors">
                             <div class="flex items-center gap-2 min-w-0">
-                                <i data-lucide="cloud" class="w-3.5 h-3.5 text-blue-400 shrink-0"></i>
-                                <div class="min-w-0">
-                                    <div class="font-mono text-slate-600 text-xs truncate">${f.name}</div>
-                                </div>
+                                <i data-lucide="cloud" class="w-3.5 h-3.5 text-sky-400 shrink-0"></i>
+                                <div class="font-mono text-slate-600 text-xs truncate font-medium">${f.name}</div>
                             </div>
                             <button onclick="restoreFromCloud('${f.path}')" class="btn btn-ghost text-xs p-1.5" title="下载并恢复"><i data-lucide="cloud-download" class="w-3 h-3"></i></button>
                         </div>
                     `).join('');
                 }
             } catch { cloudEl.innerHTML = '<div class="text-center py-4 text-red-400 text-xs">加载失败</div>'; }
-
             lucide.createIcons();
         }
 
@@ -1037,88 +1038,60 @@
             const sid = currentBackupSystem.type === 'dashboard' ? 'dashboard' : currentBackupSystem.id;
             const endpoint = currentBackupSystem.type === 'dashboard' ? '/api/restore/perform/dashboard' : `/api/restore/perform/${sid}`;
             try {
-                const res = await fetch(endpoint, {
-                    method:'POST', headers:{'Content-Type':'application/json'},
-                    body: JSON.stringify({backup_path: backupPath})
-                });
+                const res = await fetch(endpoint, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({backup_path: backupPath}) });
                 const data = await res.json();
-                showToast(data.ok ? '恢复成功' : (data.error || '恢复失败'), data.ok ? 'success' : 'error');
+                showToast(data.ok ? '✓ 恢复成功' : ('✗ ' + (data.error || '恢复失败')), data.ok ? 'success' : 'error');
                 if (data.ok) loadBackupList();
-            } catch { showToast('恢复请求失败', 'error'); }
+            } catch { showToast('✗ 恢复请求失败', 'error'); }
         }
 
         async function restoreFromCloud(remotePath) {
             if (!confirm('从云端下载并恢复？当前版本将自动备份为 pre_restore_ 文件。')) return;
             const systemId = currentBackupSystem.type === 'dashboard' ? null : currentBackupSystem.id;
             try {
-                const res = await fetch('/api/webdav/download', {
-                    method:'POST', headers:{'Content-Type':'application/json'},
-                    body: JSON.stringify({remote_path: remotePath, system_id: systemId, restore: true})
-                });
+                const res = await fetch('/api/webdav/download', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({remote_path: remotePath, system_id: systemId, restore: true}) });
                 const data = await res.json();
-                showToast(data.ok ? (data.restored ? '已从云端恢复' : '已下载') : (data.error || '失败'), data.ok ? 'success' : 'error');
+                showToast(data.ok ? (data.restored ? '✓ 已从云端恢复' : '✓ 已下载') : ('✗ ' + (data.error || '失败')), data.ok ? 'success' : 'error');
                 if (data.ok) loadBackupList();
-            } catch { showToast('请求失败', 'error'); }
+            } catch { showToast('✗ 请求失败', 'error'); }
         }
 
-        // WebDAV
-        function openWebdavModal() {
-            document.getElementById('webdav-modal').classList.remove('hidden');
-            document.getElementById('webdav-modal').classList.add('flex');
-            loadWebdavConfig();
-        }
-        function closeWebdavModal() {
-            document.getElementById('webdav-modal').classList.add('hidden');
-            document.getElementById('webdav-modal').classList.remove('flex');
-        }
+        function openWebdavModal() { document.getElementById('webdav-modal').classList.remove('hidden'); document.getElementById('webdav-modal').classList.add('flex'); loadWebdavConfig(); }
+        function closeWebdavModal() { document.getElementById('webdav-modal').classList.add('hidden'); document.getElementById('webdav-modal').classList.remove('flex'); }
+
         async function loadWebdavConfig() {
             try {
                 const res = await fetch('/api/webdav/config');
                 const data = await res.json();
-                if (data.configured) {
-                    document.getElementById('webdav_url').value = data.webdav_url || '';
-                    document.getElementById('webdav_username').value = data.username || '';
-                    document.getElementById('webdav_password').value = '';
-                }
+                if (data.configured) { document.getElementById('webdav_url').value = data.webdav_url || ''; document.getElementById('webdav_username').value = data.username || ''; document.getElementById('webdav_password').value = ''; }
             } catch {}
         }
+
         document.getElementById('webdav-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             try {
-                const res = await fetch('/api/webdav/config', {
-                    method:'POST', headers:{'Content-Type':'application/json'},
-                    body: JSON.stringify({
-                        webdav_url: document.getElementById('webdav_url').value,
-                        username: document.getElementById('webdav_username').value,
-                        password: document.getElementById('webdav_password').value
-                    })
-                });
+                const res = await fetch('/api/webdav/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ webdav_url: document.getElementById('webdav_url').value, username: document.getElementById('webdav_username').value, password: document.getElementById('webdav_password').value }) });
                 const data = await res.json();
-                if (data.ok) { closeWebdavModal(); showToast('WebDAV 配置已保存', 'success'); }
-                else showToast(data.error || '保存失败', 'error');
-            } catch { showToast('请求失败', 'error'); }
+                if (data.ok) { closeWebdavModal(); showToast('✓ WebDAV 配置已保存', 'success'); }
+                else showToast('✗ ' + (data.error || '保存失败'), 'error');
+            } catch { showToast('✗ 请求失败', 'error'); }
         });
+
         async function checkWebdav() {
-            try {
-                const res = await fetch('/api/webdav/check', {method:'POST'});
-                const data = await res.json();
-                showToast(data.ok ? '连接成功' : '连接失败: '+data.error, data.ok ? 'success' : 'error');
-            } catch { showToast('请求失败', 'error'); }
+            try { const res = await fetch('/api/webdav/check', {method:'POST'}); const data = await res.json(); showToast(data.ok ? '✓ 连接成功' : ('✗ 连接失败: ' + data.error), data.ok ? 'success' : 'error'); }
+            catch { showToast('✗ 请求失败', 'error'); }
         }
+
         async function uploadToWebdav(localPath, filename) {
             try {
                 const systemId = currentBackupSystem.type === 'dashboard' ? null : currentBackupSystem.id;
-                const res = await fetch('/api/webdav/upload', {
-                    method:'POST', headers:{'Content-Type':'application/json'},
-                    body: JSON.stringify({local_path: localPath, remote_path: filename, system_id: systemId})
-                });
+                const res = await fetch('/api/webdav/upload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({local_path: localPath, remote_path: filename, system_id: systemId}) });
                 const data = await res.json();
-                showToast(data.ok ? '已上传到云端' : '上传失败: '+(data.error||''), data.ok ? 'success' : 'error');
+                showToast(data.ok ? '✓ 已上传到云端' : ('✗ 上传失败: '+(data.error||'')), data.ok ? 'success' : 'error');
                 if (data.ok) loadBackupList();
-            } catch { showToast('上传请求失败', 'error'); }
+            } catch { showToast('✗ 上传请求失败', 'error'); }
         }
 
-        // 恢复弹窗
         function openRestoreModal(type, id, name) {
             currentRestoreSystem = {type, id, name};
             document.getElementById('restore-title').textContent = name + ' - 恢复备份';
@@ -1126,10 +1099,8 @@
             document.getElementById('restore-modal').classList.add('flex');
             loadRestoreBackups();
         }
-        function closeRestoreModal() {
-            document.getElementById('restore-modal').classList.add('hidden');
-            document.getElementById('restore-modal').classList.remove('flex');
-        }
+        function closeRestoreModal() { document.getElementById('restore-modal').classList.add('hidden'); document.getElementById('restore-modal').classList.remove('flex'); }
+
         async function loadRestoreBackups() {
             const endpoint = currentRestoreSystem.type === 'dashboard' ? '/api/backup/list/dashboard' : `/api/backup/list/${currentRestoreSystem.id}`;
             try {
@@ -1140,20 +1111,18 @@
                 sel.innerHTML = backups.map(b => `<option value="${b.backup_path}">${b.backup_file} (${formatFileSize(b.file_size)}) - ${formatDateTime(b.created_at)}</option>`).join('');
             } catch { document.getElementById('restore-select').innerHTML = '<option value="">加载失败</option>'; }
         }
+
         async function performRestore() {
             const path = document.getElementById('restore-select').value;
-            if (!path) { showToast('请选择备份文件', 'error'); return; }
+            if (!path) { showToast('✗ 请选择备份文件', 'error'); return; }
             if (!confirm('确认恢复？当前版本将自动备份。')) return;
             const endpoint = currentRestoreSystem.type === 'dashboard' ? '/api/restore/perform/dashboard' : `/api/restore/perform/${currentRestoreSystem.id}`;
             try {
-                const res = await fetch(endpoint, {
-                    method:'POST', headers:{'Content-Type':'application/json'},
-                    body: JSON.stringify({backup_path: path})
-                });
+                const res = await fetch(endpoint, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({backup_path: path}) });
                 const data = await res.json();
-                if (data.ok) { closeRestoreModal(); showToast('恢复成功', 'success'); loadBackupSystems(); }
-                else showToast(data.error || '恢复失败', 'error');
-            } catch { showToast('恢复请求失败', 'error'); }
+                if (data.ok) { closeRestoreModal(); showToast('✓ 恢复成功', 'success'); loadBackupSystems(); }
+                else showToast('✗ ' + (data.error || '恢复失败'), 'error');
+            } catch { showToast('✗ 恢复请求失败', 'error'); }
         }
 
         // ===== IP Whitelist =====
@@ -1162,58 +1131,42 @@
                 const res = await fetch('/api/net/whitelist');
                 const data = await res.json();
                 const tbody = document.getElementById('whitelist-tbody');
-                if (data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="3" class="px-4 py-6 text-center text-xs text-slate-300">暂无白名单</td></tr>';
-                    return;
-                }
+                if (data.length === 0) { tbody.innerHTML = '<tr><td colspan="3" class="px-5 py-8 text-center text-xs text-slate-300">暂无白名单</td></tr>'; return; }
                 tbody.innerHTML = data.map(w => `
-                    <tr class="border-b border-slate-100 last:border-0">
-                        <td class="px-4 py-2.5 font-mono text-xs text-slate-700">${w.cidr}</td>
-                        <td class="px-4 py-2.5 text-xs text-slate-500">${w.note || '-'}</td>
-                        <td class="px-4 py-2.5 text-right">
-                            <button onclick="deleteWhitelist(${w.id})" class="text-[10px] text-red-400 hover:text-red-600">删除</button>
+                    <tr class="whitelist-row border-b border-slate-100 last:border-0">
+                        <td class="px-5 py-3 font-mono text-xs text-slate-700 font-semibold">${w.cidr}</td>
+                        <td class="px-5 py-3 text-xs text-slate-500">${w.note || '-'}</td>
+                        <td class="px-5 py-3 text-right">
+                            <button onclick="deleteWhitelist(${w.id})" class="text-[10px] text-red-400 hover:text-red-600 font-medium transition-colors">删除</button>
                         </td>
                     </tr>`).join('');
-            } catch { /* silent */ }
+            } catch {}
         }
 
         function showAddWhitelist() {
             const el = document.getElementById('whitelist-add');
             el.classList.toggle('hidden');
-            if (!el.classList.contains('hidden')) {
-                document.getElementById('whitelist-cidr').focus();
-            }
+            if (!el.classList.contains('hidden')) setTimeout(() => document.getElementById('whitelist-cidr').focus(), 50);
         }
 
         async function addWhitelist() {
             const cidr = document.getElementById('whitelist-cidr').value.trim();
             const note = document.getElementById('whitelist-note').value.trim();
-            if (!cidr) return showToast('请输入 CIDR 地址', 'error');
+            if (!cidr) return showToast('✗ 请输入 CIDR 地址', 'error');
             try {
-                const res = await fetch('/api/net/whitelist', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ cidr, note })
-                });
+                const res = await fetch('/api/net/whitelist', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cidr, note }) });
                 if (res.ok) {
-                    showToast('白名单已添加', 'success');
-                    document.getElementById('whitelist-cidr').value = '';
-                    document.getElementById('whitelist-note').value = '';
-                    document.getElementById('whitelist-add').classList.add('hidden');
-                    loadWhitelist();
-                } else {
-                    const data = await res.json();
-                    showToast(data.error || '添加失败', 'error');
-                }
-            } catch { showToast('请求失败', 'error'); }
+                    showToast('✓ 白名单已添加', 'success');
+                    document.getElementById('whitelist-cidr').value = ''; document.getElementById('whitelist-note').value = '';
+                    document.getElementById('whitelist-add').classList.add('hidden'); loadWhitelist();
+                } else { const data = await res.json(); showToast('✗ ' + (data.error || '添加失败'), 'error'); }
+            } catch { showToast('✗ 请求失败', 'error'); }
         }
 
         async function deleteWhitelist(id) {
             if (!confirm('确定删除此白名单？')) return;
-            try {
-                await fetch(`/api/net/whitelist/${id}`, { method: 'DELETE' });
-                loadWhitelist();
-                showToast('已删除', 'success');
-            } catch { showToast('删除失败', 'error'); }
+            try { await fetch(`/api/net/whitelist/${id}`, { method: 'DELETE' }); loadWhitelist(); showToast('✓ 已删除', 'success'); }
+            catch { showToast('✗ 删除失败', 'error'); }
         }
     </script>
 </body>

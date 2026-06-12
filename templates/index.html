@@ -4,21 +4,67 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard</title>
-    <script src="/static/js/tailwind.js"></script>
+    <link rel="stylesheet" href="/static/css/tailwind.min.css">
     <script src="/static/js/lucide.min.js"></script>
     <style>
         * { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-        .drag-over { background: #f0f9ff !important; border-color: #3b82f6 !important; }
-        .dragging { opacity: 0.4; }
+
+        /* ===== Global Background ===== */
+        body {
+            background: #f8fafc;
+            background-image:
+                radial-gradient(at 20% 10%, rgba(99,102,241,0.06) 0px, transparent 50%),
+                radial-gradient(at 80% 90%, rgba(16,185,129,0.05) 0px, transparent 50%),
+                radial-gradient(at 50% 50%, rgba(59,130,246,0.03) 0px, transparent 70%);
+            min-height: 100vh;
+        }
+
+        /* ===== Header ===== */
+        .site-header {
+            background: rgba(255,255,255,0.85);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border-bottom: 1px solid rgba(226,232,240,0.8);
+            position: sticky; top: 0; z-index: 40;
+            box-shadow: 0 1px 0 0 rgba(0,0,0,0.04), 0 4px 16px -8px rgba(0,0,0,0.06);
+        }
+
+        /* ===== Section headers ===== */
+        .section-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: rgba(255,255,255,0.8); border: 1px solid rgba(226,232,240,0.6);
+            border-radius: 20px; padding: 3px 10px 3px 8px;
+            font-size: 12px; color: #64748b;
+            backdrop-filter: blur(8px);
+        }
+
+        /* ===== System Cards ===== */
+        .drag-over { background: #f0f9ff !important; border-color: #3b82f6 !important; box-shadow: 0 0 0 2px rgba(59,130,246,0.2) !important; }
+        .dragging { opacity: 0.35; transform: scale(0.97); }
         .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-        .status-online { background: #10b981; box-shadow: 0 0 6px rgba(16,185,129,0.5); }
+        .status-online { background: #10b981; box-shadow: 0 0 0 2px rgba(16,185,129,0.2), 0 0 8px rgba(16,185,129,0.5); animation: online-pulse 2.5s ease-in-out infinite; }
         .status-offline { background: #fca5a5; }
+        @keyframes online-pulse { 0%,100% { box-shadow: 0 0 0 2px rgba(16,185,129,0.2), 0 0 6px rgba(16,185,129,0.4); } 50% { box-shadow: 0 0 0 3px rgba(16,185,129,0.1), 0 0 12px rgba(16,185,129,0.6); } }
+
         .card {
             cursor: pointer;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            background: rgba(255,255,255,0.9);
+            border: 1px solid rgba(226,232,240,0.8);
+            border-radius: 16px;
+            transition: transform 0.22s cubic-bezier(.34,1.56,.64,1), box-shadow 0.22s ease, border-color 0.22s ease;
             position: relative;
+            backdrop-filter: blur(8px);
+            overflow: hidden;
         }
-        .card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px -8px rgba(0,0,0,0.12); }
+        .card::before {
+            content: '';
+            position: absolute; inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0) 60%);
+            pointer-events: none;
+            opacity: 0; transition: opacity 0.3s;
+        }
+        .card:hover { transform: translateY(-4px) scale(1.01); box-shadow: 0 12px 40px -12px rgba(0,0,0,0.15), 0 0 0 1px rgba(99,102,241,0.08); border-color: rgba(99,102,241,0.2); }
+        .card:hover::before { opacity: 1; }
         .card .drag-handle {
             opacity: 0; transition: opacity 0.2s;
             position: absolute; bottom: 12px; right: 12px;
@@ -26,69 +72,290 @@
         }
         .card:hover .drag-handle { opacity: 1; }
         .card .drag-handle:active { cursor: grabbing; }
-        .fade-in { animation: fadeIn 0.25s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .card:active { transform: translateY(-2px) scale(0.99); }
 
-        /* Metric cards */
+        /* ===== Fade-in animations ===== */
+        .fade-in { animation: fadeIn 0.35s cubic-bezier(.22,1,.36,1) both; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        .fade-in-delay-1 { animation-delay: 0.05s; }
+        .fade-in-delay-2 { animation-delay: 0.1s; }
+        .fade-in-delay-3 { animation-delay: 0.15s; }
+
+        /* ===== Card stagger animation ===== */
+        #systems-grid .card:nth-child(1) { animation-delay: 0.02s; }
+        #systems-grid .card:nth-child(2) { animation-delay: 0.07s; }
+        #systems-grid .card:nth-child(3) { animation-delay: 0.12s; }
+        #systems-grid .card:nth-child(4) { animation-delay: 0.17s; }
+        #systems-grid .card:nth-child(5) { animation-delay: 0.22s; }
+        #systems-grid .card:nth-child(6) { animation-delay: 0.27s; }
+
+        /* ===== Metric Cards ===== */
         .metric-card {
             cursor: pointer;
-            transition: transform 0.15s ease, box-shadow 0.15s ease;
+            background: rgba(255,255,255,0.92);
+            border-radius: 14px;
+            border: 1px solid rgba(226,232,240,0.8);
+            transition: transform 0.2s cubic-bezier(.34,1.56,.64,1), box-shadow 0.2s ease, border-color 0.2s ease;
+            backdrop-filter: blur(8px);
+            position: relative; overflow: hidden;
         }
-        .metric-card:hover { transform: translateY(-1px); box-shadow: 0 4px 20px -4px rgba(0,0,0,0.1); }
+        .metric-card::after {
+            content: '';
+            position: absolute; inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.6) 0%, transparent 50%);
+            pointer-events: none; opacity: 0; transition: opacity 0.25s;
+        }
+        .metric-card:hover { transform: translateY(-3px); box-shadow: 0 8px 30px -8px rgba(0,0,0,0.12); }
+        .metric-card:hover::after { opacity: 1; }
+        .metric-card:active { transform: translateY(-1px); }
 
-        .sparkline { width: 100%; height: 28px; }
+        /* Icon glow effect */
+        .icon-glow-blue { box-shadow: 0 0 0 4px rgba(59,130,246,0.08), 0 2px 8px rgba(59,130,246,0.1); }
+        .icon-glow-green { box-shadow: 0 0 0 4px rgba(16,185,129,0.08), 0 2px 8px rgba(16,185,129,0.1); }
+        .icon-glow-purple { box-shadow: 0 0 0 4px rgba(139,92,246,0.08), 0 2px 8px rgba(139,92,246,0.1); }
+        .icon-glow-amber { box-shadow: 0 0 0 4px rgba(245,158,11,0.08), 0 2px 8px rgba(245,158,11,0.1); }
+        .icon-glow-sky { box-shadow: 0 0 0 4px rgba(14,165,233,0.08), 0 2px 8px rgba(14,165,233,0.1); }
+        .icon-glow-rose { box-shadow: 0 0 0 4px rgba(244,63,94,0.08), 0 2px 8px rgba(244,63,94,0.1); }
+
+        /* ===== Number animation ===== */
+        .metric-value {
+            font-variant-numeric: tabular-nums;
+            transition: color 0.4s ease;
+        }
+
+        /* ===== Progress bars ===== */
+        .prog-bar-wrap {
+            height: 6px; border-radius: 99px;
+            background: rgba(241,245,249,0.9);
+            overflow: hidden; position: relative;
+        }
+        .prog-bar-fill {
+            height: 100%; border-radius: 99px;
+            transition: width 0.7s cubic-bezier(.22,1,.36,1);
+            position: relative; overflow: hidden;
+        }
+        .prog-bar-fill::after {
+            content: '';
+            position: absolute; top: 0; left: -100%;
+            width: 60%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+            animation: shimmer-bar 2s ease-in-out infinite;
+        }
+        @keyframes shimmer-bar { 0% { left: -60%; } 100% { left: 140%; } }
+
+        /* ===== Sparkline ===== */
+        .sparkline { width: 100%; height: 30px; }
+
+        /* ===== Range buttons ===== */
         .range-btn {
-            padding: 1px 7px; font-size: 11px; border-radius: 5px; cursor: pointer;
-            color: #94a3b8; background: transparent; border: none; transition: all 0.15s; line-height: 1.4;
+            padding: 2px 8px; font-size: 11px; border-radius: 6px; cursor: pointer;
+            color: #94a3b8; background: transparent; border: none; transition: all 0.15s; line-height: 1.5;
+            font-weight: 500;
         }
-        .range-btn:hover { color: #64748b; }
-        .range-btn.active { color: #334155; background: #f1f5f9; }
+        .range-btn:hover { color: #64748b; background: rgba(255,255,255,0.8); }
+        .range-btn.active { color: #334155; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
 
-        /* Detail modal */
+        /* ===== Detail Modal ===== */
         .modal-backdrop {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.3); backdrop-filter: blur(4px);
+            position: fixed; inset: 0;
+            background: rgba(15,23,42,0.4);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
             z-index: 50; display: flex; align-items: center; justify-content: center;
+            animation: backdropIn 0.2s ease-out;
         }
+        /* 确保 Tailwind hidden 类能覆盖 display:flex，防止弹窗默认可见 */
+        .modal-backdrop.hidden { display: none !important; }
+        @keyframes backdropIn { from { opacity: 0; } to { opacity: 1; } }
         .modal-content {
-            background: white; border-radius: 16px; width: 90%; max-width: 720px; max-height: 85vh;
-            padding: 24px; box-shadow: 0 25px 60px -12px rgba(0,0,0,0.25);
+            background: rgba(255,255,255,0.97);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            width: 90%; max-width: 720px; max-height: 85vh;
+            padding: 28px;
+            box-shadow: 0 30px 80px -20px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.5);
             display: flex; flex-direction: column;
+            animation: modalIn 0.3s cubic-bezier(.34,1.56,.64,1);
         }
+        @keyframes modalIn { from { opacity: 0; transform: scale(0.92) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         .detail-chart { width: 100%; height: 220px; }
-        /* Process table */
-        .proc-header { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
-        /* GPU sub-metric tabs */
+
+        /* ===== Process table ===== */
+        .proc-header { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+
+        /* ===== GPU sub-metric tabs ===== */
         .gpu-sub-btn {
-            padding: 2px 10px; font-size: 11px; border-radius: 6px; cursor: pointer;
-            color: #94a3b8; background: transparent; border: 1px solid #e2e8f0; transition: all 0.15s;
+            padding: 3px 11px; font-size: 11px; border-radius: 7px; cursor: pointer;
+            color: #94a3b8; background: transparent; border: 1px solid #e2e8f0;
+            transition: all 0.15s; font-weight: 500;
         }
-        .gpu-sub-btn:hover { color: #64748b; border-color: #cbd5e1; }
-        .gpu-sub-btn.active { color: #6d28d9; background: #f5f3ff; border-color: #c4b5fd; }
-        /* GPU locked state */
-        .gpu-locked { border-color: #ef4444 !important; box-shadow: 0 0 12px rgba(239,68,68,0.25); }
-        @keyframes pulse { 0%,100% { box-shadow: 0 0 12px rgba(239,68,68,0.25); } 50% { box-shadow: 0 0 20px rgba(239,68,68,0.45); } }
-        .gpu-locked.pulse { animation: pulse 2s infinite; }
-        /* Resource alert state */
+        .gpu-sub-btn:hover { color: #64748b; border-color: #cbd5e1; background: #f8fafc; }
+        .gpu-sub-btn.active { color: #6d28d9; background: #f5f3ff; border-color: #c4b5fd; box-shadow: 0 0 0 2px rgba(139,92,246,0.1); }
+
+        /* ===== GPU locked ===== */
+        .gpu-locked { border-color: #ef4444 !important; }
+        @keyframes gpu-alert-pulse { 0%,100% { box-shadow: 0 0 0 2px rgba(239,68,68,0.15), 0 0 12px rgba(239,68,68,0.2); } 50% { box-shadow: 0 0 0 3px rgba(239,68,68,0.1), 0 0 20px rgba(239,68,68,0.35); } }
+        .gpu-locked.pulse { animation: gpu-alert-pulse 2s infinite; }
+
+        /* ===== Resource alert ===== */
         .metric-alert { border-color: #ef4444 !important; }
-        @keyframes alert-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.2); } 50% { box-shadow: 0 0 12px 4px rgba(239,68,68,0.35); } }
+        @keyframes alert-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.15); } 50% { box-shadow: 0 0 12px 4px rgba(239,68,68,0.3); } }
         .metric-alert { animation: alert-pulse 2s infinite; }
+
+        /* ===== Section separator ===== */
+        .section-divider {
+            display: flex; align-items: center; gap: 12px;
+            margin-bottom: 20px;
+        }
+        .section-divider::after {
+            content: ''; flex: 1; height: 1px;
+            background: linear-gradient(to right, rgba(226,232,240,0.8), transparent);
+        }
+
+        /* ===== Shimmer skeleton ===== */
+        @keyframes shimmer {
+            0% { background-position: -300px 0; }
+            100% { background-position: 300px 0; }
+        }
+        .skeleton {
+            background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+            background-size: 600px 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 6px;
+        }
+
+        /* ===== Alert badge ===== */
+        .alert-badge {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 18px; height: 18px; padding: 0 5px;
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white; border-radius: 99px;
+            font-size: 10px; font-weight: 700;
+            box-shadow: 0 2px 6px rgba(239,68,68,0.35);
+            animation: badge-pop 0.3s cubic-bezier(.34,1.56,.64,1);
+        }
+        @keyframes badge-pop { from { transform: scale(0); } to { transform: scale(1); } }
+
+        /* ===== Card icon gradient ===== */
+        .card-icon-wrap {
+            width: 42px; height: 42px;
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            color: white;
+            box-shadow: 0 4px 12px -4px rgba(0,0,0,0.25);
+            transition: transform 0.3s cubic-bezier(.34,1.56,.64,1);
+        }
+        .card:hover .card-icon-wrap { transform: scale(1.1) rotate(-2deg); }
+
+        /* ===== Network section ===== */
+        .net-iface-row {
+            transition: background 0.15s;
+            border-radius: 8px; padding: 6px 8px; margin: 0 -8px;
+        }
+        .net-iface-row:hover { background: rgba(241,245,249,0.7); }
+
+        /* ===== Event items ===== */
+        .event-item {
+            display: flex; align-items: center; gap: 8px;
+            padding: 6px 10px; border-radius: 8px; margin: 0 -10px;
+            transition: background 0.15s;
+        }
+        .event-item:hover { background: rgba(241,245,249,0.7); }
+
+        /* ===== Scrollbar ===== */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* ===== Process rows ===== */
+        .proc-row {
+            transition: background 0.12s;
+            border-radius: 6px; padding: 4px 4px;
+        }
+        .proc-row:hover { background: rgba(241,245,249,0.8); }
+
+        /* ===== Uptime chip ===== */
+        .uptime-chip {
+            font-size: 11px; color: #10b981;
+            background: rgba(16,185,129,0.08);
+            padding: 1px 8px; border-radius: 99px;
+            border: 1px solid rgba(16,185,129,0.15);
+        }
+
+        /* ===== Online count badge ===== */
+        .online-badge {
+            background: rgba(16,185,129,0.1);
+            color: #10b981;
+            padding: 2px 8px 2px 6px;
+            border-radius: 99px; font-size: 12px; font-weight: 600;
+            border: 1px solid rgba(16,185,129,0.2);
+            display: flex; align-items: center; gap: 4px;
+        }
+
+        /* ===== Manage button ===== */
+        .manage-btn {
+            display: flex; align-items: center; gap: 6px;
+            padding: 6px 14px; font-size: 13px; font-weight: 500;
+            color: #64748b; border-radius: 10px;
+            border: 1px solid rgba(226,232,240,0.8);
+            background: rgba(255,255,255,0.8);
+            transition: all 0.2s;
+            text-decoration: none;
+            backdrop-filter: blur(8px);
+        }
+        .manage-btn:hover { color: #1e293b; background: white; border-color: #cbd5e1; box-shadow: 0 2px 8px rgba(0,0,0,0.06); transform: translateY(-1px); }
+
+        /* ===== Tooltip ===== */
+        [title]:hover::after {
+            content: attr(title);
+            position: absolute; bottom: calc(100% + 6px); left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b; color: white;
+            font-size: 11px; padding: 3px 8px; border-radius: 6px;
+            white-space: nowrap; pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 100;
+        }
+
+        /* ===== Alert history ===== */
+        .alert-row {
+            border-left: 3px solid #ef4444;
+            background: rgba(254,242,242,0.5);
+            border-radius: 0 8px 8px 0;
+            padding: 8px 12px;
+            transition: background 0.15s;
+        }
+        .alert-row:hover { background: rgba(254,242,242,0.8); }
+
+        /* ===== Gradient text ===== */
+        .gradient-title {
+            background: linear-gradient(135deg, #334155 0%, #1e40af 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 640px) {
+            .modal-content { padding: 18px; border-radius: 16px; max-height: 92vh; }
+        }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen">
+<body>
     <!-- Header -->
-    <header class="bg-white/80 backdrop-blur-sm border-b border-slate-200/60 sticky top-0 z-10">
+    <header class="site-header">
         <div class="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center">
+                <div class="w-9 h-9 bg-gradient-to-br from-blue-500 via-indigo-500 to-violet-500 rounded-xl flex items-center justify-center shadow-md shadow-indigo-200/50">
                     <i data-lucide="layout-grid" class="w-4 h-4 text-white"></i>
                 </div>
-                <span class="text-lg font-semibold text-slate-800">Dashboard</span>
-                <div class="flex items-center gap-1.5 ml-3 text-xs text-slate-400">
+                <span class="text-lg font-bold gradient-title">Dashboard</span>
+                <div id="online-badge-wrap" class="online-badge ml-2">
                     <span class="status-dot status-online" style="width:6px;height:6px;"></span>
                     <span id="online-count">0</span>/<span id="total-count">0</span>
                 </div>
             </div>
-            <a href="/manage" class="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+            <a href="/manage" class="manage-btn">
                 <i data-lucide="settings" class="w-4 h-4"></i>
                 管理
             </a>
@@ -102,182 +369,201 @@
         </div>
 
         <!-- Empty State -->
-        <div id="empty-state" class="hidden text-center py-20">
-            <div class="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <i data-lucide="inbox" class="w-8 h-8 text-slate-300"></i>
+        <div id="empty-state" class="hidden text-center py-24">
+            <div class="w-20 h-20 bg-gradient-to-br from-slate-100 to-slate-50 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-inner">
+                <i data-lucide="inbox" class="w-10 h-10 text-slate-300"></i>
             </div>
             <p class="text-slate-400 text-sm">暂无系统，前往管理页面添加</p>
+            <a href="/manage" class="inline-flex items-center gap-2 mt-4 px-5 py-2.5 bg-blue-500 text-white rounded-xl text-sm font-medium hover:bg-blue-600 transition-colors shadow-md shadow-blue-200/50">
+                <i data-lucide="plus" class="w-4 h-4"></i> 添加系统
+            </a>
         </div>
 
         <!-- WSL Monitor -->
         <div class="mt-16">
-            <div class="flex items-center gap-2 mb-4">
-                <i data-lucide="activity" class="w-4 h-4 text-slate-300"></i>
-                <h2 class="text-sm font-medium text-slate-400">系统状态</h2>
-                <div class="ml-auto flex gap-0.5 bg-slate-100 rounded-md p-0.5">
+            <div class="section-divider">
+                <div class="section-badge fade-in">
+                    <i data-lucide="activity" class="w-3.5 h-3.5 text-blue-400"></i>
+                    <span class="font-medium">系统状态</span>
+                </div>
+                <div class="flex items-center gap-1 bg-white/80 backdrop-blur-sm rounded-lg p-0.5 shadow-sm border border-slate-100">
                     <button onclick="switchRange(24)" class="range-btn active" data-range="24">24h</button>
                     <button onclick="switchRange(168)" class="range-btn" data-range="168">7d</button>
                     <button onclick="switchRange(720)" class="range-btn" data-range="720">30d</button>
                 </div>
-                <span id="uptime" class="text-xs text-slate-300"></span>
+                <span id="uptime" class="uptime-chip hidden"></span>
             </div>
 
             <!-- Row1: CPU / Memory / GPU -->
             <div class="grid grid-cols-3 gap-4">
                 <!-- CPU -->
-                <div class="metric-card bg-white rounded-xl border border-slate-200/80 p-4" id="card-cpu" onclick="showDetail('cpu')">
-                    <div class="flex items-center gap-2 mb-3">
-                        <div class="w-7 h-7 rounded-md bg-blue-50 flex items-center justify-center">
-                            <i data-lucide="cpu" class="w-3.5 h-3.5 text-blue-400"></i>
+                <div class="metric-card p-4 fade-in" id="card-cpu" onclick="showDetail('cpu')">
+                    <div class="flex items-center gap-2.5 mb-3">
+                        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center icon-glow-blue">
+                            <i data-lucide="cpu" class="w-4 h-4 text-white"></i>
                         </div>
-                        <span class="text-xs text-slate-400">CPU</span>
+                        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">CPU</span>
                     </div>
-                    <div class="text-2xl font-bold text-slate-800" id="cpu-val">--</div>
-                    <div class="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div id="cpu-bar" class="h-full bg-blue-400 rounded-full transition-all duration-500" style="width:0%"></div>
+                    <div class="text-2xl font-bold text-slate-800 metric-value" id="cpu-val">
+                        <span class="skeleton" style="display:inline-block;width:48px;height:24px;"> </span>
                     </div>
-                    <svg class="sparkline mt-2" id="cpu-spark"></svg>
+                    <div class="mt-2.5 prog-bar-wrap">
+                        <div id="cpu-bar" class="prog-bar-fill bg-gradient-to-r from-blue-400 to-blue-500" style="width:0%"></div>
+                    </div>
+                    <svg class="sparkline mt-2.5" id="cpu-spark"></svg>
                 </div>
                 <!-- Memory -->
-                <div class="metric-card bg-white rounded-xl border border-slate-200/80 p-4" id="card-memory" onclick="showDetail('mem')">
-                    <div class="flex items-center gap-2 mb-3">
-                        <div class="w-7 h-7 rounded-md bg-emerald-50 flex items-center justify-center">
-                            <i data-lucide="memory-stick" class="w-3.5 h-3.5 text-emerald-400"></i>
+                <div class="metric-card p-4 fade-in fade-in-delay-1" id="card-memory" onclick="showDetail('mem')">
+                    <div class="flex items-center gap-2.5 mb-3">
+                        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center icon-glow-green">
+                            <i data-lucide="memory-stick" class="w-4 h-4 text-white"></i>
                         </div>
-                        <span class="text-xs text-slate-400">Memory</span>
+                        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Memory</span>
                     </div>
-                    <div class="text-2xl font-bold text-slate-800" id="mem-val">--</div>
-                    <div class="text-xs text-slate-400 mt-0.5" id="mem-detail"></div>
-                    <div class="mt-1.5 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div id="mem-bar" class="h-full bg-emerald-400 rounded-full transition-all duration-500" style="width:0%"></div>
+                    <div class="text-2xl font-bold text-slate-800 metric-value" id="mem-val">
+                        <span class="skeleton" style="display:inline-block;width:48px;height:24px;"> </span>
                     </div>
-                    <svg class="sparkline mt-2" id="mem-spark"></svg>
+                    <div class="text-xs text-slate-400 mt-0.5 font-mono" id="mem-detail"></div>
+                    <div class="mt-1.5 prog-bar-wrap">
+                        <div id="mem-bar" class="prog-bar-fill bg-gradient-to-r from-emerald-400 to-emerald-500" style="width:0%"></div>
+                    </div>
+                    <svg class="sparkline mt-2.5" id="mem-spark"></svg>
                 </div>
                 <!-- GPU -->
-                <div class="metric-card bg-white rounded-xl border border-slate-200/80 p-4" onclick="showDetail('gpu')" id="gpu-card">
-                    <div class="flex items-center gap-2 mb-3">
-                        <div class="w-7 h-7 rounded-md bg-purple-50 flex items-center justify-center">
-                            <i data-lucide="gpu" class="w-3.5 h-3.5 text-purple-400"></i>
+                <div class="metric-card p-4 fade-in fade-in-delay-2" onclick="showDetail('gpu')" id="gpu-card">
+                    <div class="flex items-center gap-2.5 mb-3">
+                        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-400 to-purple-500 flex items-center justify-center icon-glow-purple">
+                            <i data-lucide="gpu" class="w-4 h-4 text-white"></i>
                         </div>
-                        <span class="text-xs text-slate-400">GPU</span>
+                        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">GPU</span>
                         <span id="gpu-name" class="text-[10px] text-slate-300 ml-auto truncate max-w-[80px]"></span>
                     </div>
                     <div id="gpu-body">
-                        <div class="text-2xl font-bold text-slate-800" id="gpu-util-val">--</div>
-                        <div class="text-xs text-slate-400 mt-0.5" id="gpu-mem-detail"></div>
-                        <div class="mt-1.5 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div id="gpu-mem-bar" class="h-full bg-purple-400 rounded-full transition-all duration-500" style="width:0%"></div>
+                        <div class="text-2xl font-bold text-slate-800 metric-value" id="gpu-util-val">
+                            <span class="skeleton" style="display:inline-block;width:48px;height:24px;"> </span>
                         </div>
-                        <svg class="sparkline mt-2" id="gpu-spark"></svg>
-                        <div id="gpu-lock-bar" class="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between hidden">
+                        <div class="text-xs text-slate-400 mt-0.5 font-mono" id="gpu-mem-detail"></div>
+                        <div class="mt-1.5 prog-bar-wrap">
+                            <div id="gpu-mem-bar" class="prog-bar-fill bg-gradient-to-r from-violet-400 to-purple-500" style="width:0%"></div>
+                        </div>
+                        <svg class="sparkline mt-2.5" id="gpu-spark"></svg>
+                        <div id="gpu-lock-bar" class="mt-2 pt-2 border-t border-slate-100/80 flex items-center justify-between hidden">
                             <span class="text-[11px] text-slate-500 flex items-center gap-1">
                                 <span id="gpu-lock-icon"></span>
                                 <span id="gpu-lock-text"></span>
                             </span>
-                            <button id="gpu-lock-btn" onclick="toggleGpuLock(event)" class="text-[10px] px-2 py-0.5 rounded transition-colors"></button>
+                            <button id="gpu-lock-btn" onclick="toggleGpuLock(event)" class="text-[10px] px-2.5 py-0.5 rounded-lg transition-all font-medium"></button>
                         </div>
                     </div>
-                    <div id="gpu-unavailable" class="hidden text-xs text-slate-300 mt-4">N/A</div>
+                    <div id="gpu-unavailable" class="hidden text-xs text-slate-300 mt-4 text-center">N/A</div>
                 </div>
             </div>
 
             <!-- Row2: Disk IO / Net IO / Load -->
             <div class="grid grid-cols-3 gap-4 mt-4">
                 <!-- Disk IO -->
-                <div class="metric-card bg-white rounded-xl border border-slate-200/80 p-4" onclick="showDetail('disk_io')">
-                    <div class="flex items-center gap-2 mb-3">
-                        <div class="w-7 h-7 rounded-md bg-amber-50 flex items-center justify-center">
-                            <i data-lucide="hard-drive" class="w-3.5 h-3.5 text-amber-400"></i>
+                <div class="metric-card p-4 fade-in" onclick="showDetail('disk_io')">
+                    <div class="flex items-center gap-2.5 mb-3">
+                        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-orange-400 flex items-center justify-center icon-glow-amber">
+                            <i data-lucide="hard-drive" class="w-4 h-4 text-white"></i>
                         </div>
-                        <span class="text-xs text-slate-400">Disk IO</span>
+                        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Disk IO</span>
                     </div>
-                    <div class="flex justify-between text-sm">
-                        <div>
-                            <span class="text-slate-300 text-[10px]">READ</span>
-                            <div class="font-semibold text-slate-700" id="dio-read">--</div>
+                    <div class="flex justify-between text-sm gap-2">
+                        <div class="flex-1 bg-slate-50/80 rounded-lg p-2 text-center">
+                            <span class="block text-slate-400 text-[10px] font-semibold uppercase mb-0.5">Read</span>
+                            <div class="font-bold text-slate-700 font-mono text-sm" id="dio-read">--</div>
                         </div>
-                        <div class="text-right">
-                            <span class="text-slate-300 text-[10px]">WRITE</span>
-                            <div class="font-semibold text-slate-700" id="dio-write">--</div>
+                        <div class="flex-1 bg-slate-50/80 rounded-lg p-2 text-center">
+                            <span class="block text-slate-400 text-[10px] font-semibold uppercase mb-0.5">Write</span>
+                            <div class="font-bold text-slate-700 font-mono text-sm" id="dio-write">--</div>
                         </div>
                     </div>
                 </div>
                 <!-- Net IO -->
-                <div class="metric-card bg-white rounded-xl border border-slate-200/80 p-4" onclick="showDetail('net_io')">
-                    <div class="flex items-center gap-2 mb-3">
-                        <div class="w-7 h-7 rounded-md bg-sky-50 flex items-center justify-center">
-                            <i data-lucide="wifi" class="w-3.5 h-3.5 text-sky-400"></i>
+                <div class="metric-card p-4 fade-in fade-in-delay-1" onclick="showDetail('net_io')">
+                    <div class="flex items-center gap-2.5 mb-3">
+                        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-400 to-cyan-400 flex items-center justify-center icon-glow-sky">
+                            <i data-lucide="wifi" class="w-4 h-4 text-white"></i>
                         </div>
-                        <span class="text-xs text-slate-400">Network</span>
+                        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Network</span>
                     </div>
-                    <div class="flex justify-between text-sm">
-                        <div>
-                            <span class="text-slate-300 text-[10px]">UP</span>
-                            <div class="font-semibold text-slate-700" id="nio-sent">--</div>
+                    <div class="flex justify-between text-sm gap-2">
+                        <div class="flex-1 bg-slate-50/80 rounded-lg p-2 text-center">
+                            <span class="block text-sky-400 text-[10px] font-semibold uppercase mb-0.5">↑ Up</span>
+                            <div class="font-bold text-slate-700 font-mono text-sm" id="nio-sent">--</div>
                         </div>
-                        <div class="text-right">
-                            <span class="text-slate-300 text-[10px]">DOWN</span>
-                            <div class="font-semibold text-slate-700" id="nio-recv">--</div>
+                        <div class="flex-1 bg-slate-50/80 rounded-lg p-2 text-center">
+                            <span class="block text-emerald-400 text-[10px] font-semibold uppercase mb-0.5">↓ Down</span>
+                            <div class="font-bold text-slate-700 font-mono text-sm" id="nio-recv">--</div>
                         </div>
                     </div>
                 </div>
                 <!-- Load Average -->
-                <div class="metric-card bg-white rounded-xl border border-slate-200/80 p-4" onclick="showDetail('load')">
-                    <div class="flex items-center gap-2 mb-3">
-                        <div class="w-7 h-7 rounded-md bg-rose-50 flex items-center justify-center">
-                            <i data-lucide="gauge" class="w-3.5 h-3.5 text-rose-400"></i>
+                <div class="metric-card p-4 fade-in fade-in-delay-2" onclick="showDetail('load')">
+                    <div class="flex items-center gap-2.5 mb-3">
+                        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-400 to-pink-500 flex items-center justify-center icon-glow-rose">
+                            <i data-lucide="gauge" class="w-4 h-4 text-white"></i>
                         </div>
-                        <span class="text-xs text-slate-400">Load</span>
+                        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Load Avg</span>
                     </div>
                     <div class="flex gap-2 text-sm">
-                        <div class="text-center flex-1">
-                            <span class="text-slate-300 text-[10px]">1m</span>
-                            <div class="font-semibold text-slate-700" id="load-1">--</div>
+                        <div class="flex-1 bg-slate-50/80 rounded-lg p-2 text-center">
+                            <span class="block text-slate-400 text-[10px] font-semibold mb-0.5">1m</span>
+                            <div class="font-bold text-slate-700 font-mono" id="load-1">--</div>
                         </div>
-                        <div class="text-center flex-1">
-                            <span class="text-slate-300 text-[10px]">5m</span>
-                            <div class="font-semibold text-slate-700" id="load-5">--</div>
+                        <div class="flex-1 bg-slate-50/80 rounded-lg p-2 text-center">
+                            <span class="block text-slate-400 text-[10px] font-semibold mb-0.5">5m</span>
+                            <div class="font-bold text-slate-700 font-mono" id="load-5">--</div>
                         </div>
-                        <div class="text-center flex-1">
-                            <span class="text-slate-300 text-[10px]">15m</span>
-                            <div class="font-semibold text-slate-700" id="load-15">--</div>
+                        <div class="flex-1 bg-slate-50/80 rounded-lg p-2 text-center">
+                            <span class="block text-slate-400 text-[10px] font-semibold mb-0.5">15m</span>
+                            <div class="font-bold text-slate-700 font-mono" id="load-15">--</div>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- Row3: Top Processes -->
-            <div class="mt-4 bg-white rounded-xl border border-slate-200/80 p-4">
+            <div class="mt-4 bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-200/60 p-4 shadow-sm">
                 <div class="flex items-center gap-2 mb-3">
-                    <i data-lucide="list" class="w-3.5 h-3.5 text-slate-300"></i>
-                    <span class="text-xs text-slate-400">Top Processes</span>
-                    <button id="proc-expand-btn" onclick="toggleProcesses()" class="ml-auto text-xs text-blue-500 hover:text-blue-700 hidden">展开全部</button>
+                    <div class="w-6 h-6 rounded-md bg-slate-100 flex items-center justify-center">
+                        <i data-lucide="list" class="w-3.5 h-3.5 text-slate-400"></i>
+                    </div>
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Top Processes</span>
+                    <button id="proc-expand-btn" onclick="toggleProcesses()" class="ml-auto text-xs text-blue-500 hover:text-blue-700 font-medium transition-colors hidden"></button>
                 </div>
                 <div id="top-processes" class="text-xs text-slate-500">
-                    <span class="text-slate-300">加载中...</span>
+                    <div class="skeleton h-3 w-full mb-2 rounded"></div>
+                    <div class="skeleton h-3 w-5/6 mb-2 rounded"></div>
+                    <div class="skeleton h-3 w-4/6 rounded"></div>
                 </div>
             </div>
 
             <!-- Boot/Shutdown Events -->
-            <div class="mt-4 bg-white rounded-xl border border-slate-200/80 p-4">
+            <div class="mt-4 bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-200/60 p-4 shadow-sm">
                 <div class="flex items-center gap-2 mb-3">
-                    <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-300"></i>
-                    <span class="text-xs text-slate-400">开关机记录</span>
+                    <div class="w-6 h-6 rounded-md bg-slate-100 flex items-center justify-center">
+                        <i data-lucide="clock" class="w-3.5 h-3.5 text-slate-400"></i>
+                    </div>
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">开关机记录</span>
                 </div>
-                <div id="events-list" class="space-y-1.5 max-h-32 overflow-y-auto text-xs text-slate-500">
-                    <span class="text-slate-300">加载中...</span>
+                <div id="events-list" class="space-y-0.5 max-h-36 overflow-y-auto text-xs text-slate-500">
+                    <div class="skeleton h-3 w-3/4 rounded"></div>
                 </div>
             </div>
 
             <!-- Resource Alert History -->
-            <div class="mt-4 bg-white rounded-xl border border-slate-200/80 p-4">
+            <div class="mt-4 bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-200/60 p-4 shadow-sm">
                 <div class="flex items-center gap-2 mb-3">
-                    <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-400"></i>
-                    <span class="text-xs text-slate-400">告警记录</span>
-                    <span id="alert-history-count" class="text-[10px] bg-red-50 text-red-500 px-1.5 py-0.5 rounded-full hidden"></span>
-                    <button id="alert-history-expand" onclick="toggleAlertHistory()" class="ml-auto text-xs text-blue-500 hover:text-blue-700 hidden">展开全部</button>
+                    <div class="w-6 h-6 rounded-md bg-amber-50 flex items-center justify-center">
+                        <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-400"></i>
+                    </div>
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">告警记录</span>
+                    <span id="alert-history-count" class="alert-badge hidden"></span>
+                    <button id="alert-history-expand" onclick="toggleAlertHistory()" class="ml-auto text-xs text-blue-500 hover:text-blue-700 font-medium transition-colors hidden"></button>
                 </div>
-                <div id="alert-history-list" class="space-y-1.5 text-xs text-slate-500">
+                <div id="alert-history-list" class="space-y-2 text-xs text-slate-500">
                     <span class="text-slate-300">加载中...</span>
                 </div>
             </div>
@@ -285,51 +571,57 @@
 
         <!-- Network Monitor -->
         <div class="mt-16" id="net-monitor">
-            <div class="flex items-center gap-2 mb-4">
-                <i data-lucide="network" class="w-4 h-4 text-slate-300"></i>
-                <h2 class="text-sm font-medium text-slate-400">网络监控</h2>
-                <button onclick="loadNetData()" class="ml-auto p-1.5 rounded-md hover:bg-slate-100 text-slate-300 hover:text-slate-500 transition-colors" title="刷新">
-                    <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+            <div class="section-divider">
+                <div class="section-badge fade-in">
+                    <i data-lucide="network" class="w-3.5 h-3.5 text-sky-400"></i>
+                    <span class="font-medium">网络监控</span>
+                </div>
+                <button onclick="loadNetData()" class="w-8 h-8 rounded-lg bg-white/80 border border-slate-200/60 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-white hover:shadow-sm transition-all" title="刷新">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
                 </button>
             </div>
 
             <!-- Row: Traffic overview + Top processes -->
             <div class="grid grid-cols-2 gap-4">
                 <!-- Traffic card -->
-                <div class="metric-card bg-white rounded-xl border border-slate-200/80 p-4">
-                    <div class="flex items-center gap-2 mb-3">
-                        <div class="w-7 h-7 rounded-md bg-sky-50 flex items-center justify-center">
-                            <i data-lucide="bar-chart-3" class="w-3.5 h-3.5 text-sky-400"></i>
+                <div class="metric-card p-4">
+                    <div class="flex items-center gap-2.5 mb-3">
+                        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-400 to-blue-500 flex items-center justify-center icon-glow-sky">
+                            <i data-lucide="bar-chart-3" class="w-4 h-4 text-white"></i>
                         </div>
-                        <span class="text-xs text-slate-400">今日流量</span>
+                        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">今日流量</span>
                     </div>
                     <div id="net-traffic-content">
-                        <span class="text-xs text-slate-300">加载中...</span>
+                        <div class="skeleton h-3 w-full mb-2 rounded"></div>
+                        <div class="skeleton h-3 w-4/5 rounded"></div>
                     </div>
                 </div>
                 <!-- Top network processes -->
-                <div class="metric-card bg-white rounded-xl border border-slate-200/80 p-4">
-                    <div class="flex items-center gap-2 mb-3">
-                        <div class="w-7 h-7 rounded-md bg-teal-50 flex items-center justify-center">
-                            <i data-lucide="arrow-up-down" class="w-3.5 h-3.5 text-teal-400"></i>
+                <div class="metric-card p-4">
+                    <div class="flex items-center gap-2.5 mb-3">
+                        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-400 to-emerald-500 flex items-center justify-center">
+                            <i data-lucide="arrow-up-down" class="w-4 h-4 text-white"></i>
                         </div>
-                        <span class="text-xs text-slate-400">进程流量 Top</span>
+                        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">进程流量 Top</span>
                     </div>
                     <div id="net-processes" class="text-xs text-slate-500">
-                        <span class="text-slate-300">加载中...</span>
+                        <div class="skeleton h-3 w-full mb-2 rounded"></div>
+                        <div class="skeleton h-3 w-4/5 rounded"></div>
                     </div>
                 </div>
             </div>
 
             <!-- Row: Alerts -->
-            <div id="net-alerts-area" class="mt-4 bg-white rounded-xl border border-slate-200/80 p-4 hidden">
+            <div id="net-alerts-area" class="mt-4 bg-white/80 backdrop-blur-sm rounded-2xl border border-amber-200/60 p-4 shadow-sm hidden">
                 <div class="flex items-center gap-2 mb-3">
-                    <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-400"></i>
-                    <span class="text-xs text-slate-400">异常告警</span>
-                    <span id="net-alert-count" class="text-[10px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-full hidden"></span>
-                    <button id="alert-expand-btn" onclick="toggleAlerts()" class="ml-auto text-xs text-blue-500 hover:text-blue-700 hidden">展开全部</button>
+                    <div class="w-6 h-6 rounded-md bg-amber-50 flex items-center justify-center">
+                        <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-400"></i>
+                    </div>
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">异常告警</span>
+                    <span id="net-alert-count" class="alert-badge hidden"></span>
+                    <button id="alert-expand-btn" onclick="toggleAlerts()" class="ml-auto text-xs text-blue-500 hover:text-blue-700 font-medium transition-colors hidden"></button>
                 </div>
-                <div id="net-alerts" class="space-y-1 text-xs text-slate-500"></div>
+                <div id="net-alerts" class="space-y-1.5 text-xs text-slate-500"></div>
             </div>
         </div>
     </main>
@@ -338,32 +630,37 @@
     <div id="detail-modal" class="modal-backdrop hidden" onclick="closeDetail(event)">
         <div class="modal-content" onclick="event.stopPropagation()">
             <div class="flex items-center justify-between mb-4">
-                <div class="flex items-center gap-2">
-                    <i id="detail-icon" data-lucide="cpu" class="w-5 h-5 text-slate-400"></i>
-                    <h3 id="detail-title" class="text-lg font-semibold text-slate-800"></h3>
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-slate-100 to-slate-50 flex items-center justify-center">
+                        <i id="detail-icon" data-lucide="cpu" class="w-5 h-5 text-slate-500"></i>
+                    </div>
+                    <h3 id="detail-title" class="text-lg font-bold text-slate-800"></h3>
                 </div>
-                <div class="flex items-center gap-3">
-                    <span id="detail-range-label" class="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded"></span>
-                    <button onclick="closeDetail()" class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors">
-                        <i data-lucide="x" class="w-4 h-4 text-slate-400"></i>
+                <div class="flex items-center gap-2">
+                    <span id="detail-range-label" class="text-xs text-slate-500 bg-slate-100/80 px-2.5 py-1.5 rounded-lg font-medium"></span>
+                    <button onclick="closeDetail()" class="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-slate-100 transition-all text-slate-400 hover:text-slate-600">
+                        <i data-lucide="x" class="w-4 h-4"></i>
                     </button>
                 </div>
             </div>
             <div class="flex items-end gap-4 mb-4">
-                <div class="text-4xl font-bold text-slate-800" id="detail-current">--</div>
-                <div class="text-sm text-slate-400 pb-1">
+                <div class="text-4xl font-bold text-slate-800 metric-value font-mono" id="detail-current">--</div>
+                <div class="text-sm text-slate-400 pb-1 font-mono">
                     <span id="detail-stat"></span>
                 </div>
             </div>
-            <!-- Sub-metric tabs (e.g. GPU: util / mem / temp / power) -->
-            <div id="detail-sub" class="hidden flex gap-1 mb-3"></div>
+            <!-- Sub-metric tabs -->
+            <div id="detail-sub" class="hidden flex gap-1.5 mb-4"></div>
             <svg class="detail-chart" id="detail-spark"></svg>
             <!-- GPU lock history -->
             <div id="detail-gpu-log" class="hidden mt-4 pt-4 border-t border-slate-100">
-                <div class="text-xs font-medium text-slate-400 mb-2">加锁/解锁记录</div>
+                <div class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">加锁 / 解锁记录</div>
                 <div id="detail-gpu-log-rows" class="space-y-1 text-xs text-slate-500 max-h-40 overflow-y-auto"></div>
             </div>
-            <div class="mt-2 text-[10px] text-slate-300 text-center">滚轮缩放时间范围 · 点击外部关闭</div>
+            <div class="mt-3 text-[10px] text-slate-300 text-center flex items-center justify-center gap-1">
+                <i data-lucide="mouse" class="w-3 h-3"></i>
+                滚轮缩放时间范围 · 点击外部关闭
+            </div>
         </div>
     </div>
 
@@ -383,7 +680,7 @@
         let detailInterval = null;
         let detailType = '';
         let detailHours = 24;
-        const DETAIL_HOURS = [1, 6, 24, 72, 168, 720]; // 1h, 6h, 24h, 3d, 7d, 30d
+        const DETAIL_HOURS = [1, 6, 24, 72, 168, 720];
         const DETAIL_HOURS_LABEL = {'1':'1h', '6':'6h', '24':'24h', '72':'3d', '168':'7d', '720':'30d'};
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -403,14 +700,8 @@
             setInterval(loadAlertStatus, 30000);
         });
 
-        // ===== Resource Alert Status (v0.6) =====
-        // Maps metric name → card element id
-        const ALERT_CARD_MAP = {
-            cpu:    'card-cpu',
-            memory: 'card-memory',
-            disk:   null,          // disk% is global, no dedicated card on row1; skip visual for now
-            gpu:    'gpu-card',
-        };
+        // ===== Resource Alert Status =====
+        const ALERT_CARD_MAP = { cpu: 'card-cpu', memory: 'card-memory', disk: null, gpu: 'gpu-card' };
 
         async function loadAlertStatus() {
             try {
@@ -423,74 +714,47 @@
                     if (!cardId) continue;
                     const card = document.getElementById(cardId);
                     if (!card) continue;
-                    if (info.active) {
-                        card.classList.add('metric-alert');
-                        anyActive = true;
-                    } else {
-                        // Only remove metric-alert; don't touch gpu-locked class
-                        card.classList.remove('metric-alert');
-                    }
+                    if (info.active) { card.classList.add('metric-alert'); anyActive = true; }
+                    else card.classList.remove('metric-alert');
                 }
-                // Browser notification (supplementary, only when tab is open)
                 if (anyActive && 'Notification' in window) {
                     if (Notification.permission === 'granted') {
-                        const alertMetrics = Object.entries(status)
-                            .filter(([, v]) => v.active)
-                            .map(([k, v]) => `${k.toUpperCase()} ${v.hit_count > 0 ? '超阈值' : ''}`);
-                        if (alertMetrics.length > 0) {
-                            new Notification('Dashboard 资源告警', {
-                                body: alertMetrics.join(' · '),
-                                icon: '/favicon.ico',
-                                tag: 'resource-alert',  // dedup: only one notification at a time
-                                renotify: false
-                            });
-                        }
-                    } else if (Notification.permission === 'default') {
-                        Notification.requestPermission();
-                    }
+                        const alertMetrics = Object.entries(status).filter(([,v]) => v.active).map(([k,v]) => `${k.toUpperCase()} ${v.hit_count > 0 ? '超阈值' : ''}`);
+                        if (alertMetrics.length > 0) new Notification('Dashboard 资源告警', { body: alertMetrics.join(' · '), icon: '/favicon.ico', tag: 'resource-alert', renotify: false });
+                    } else if (Notification.permission === 'default') Notification.requestPermission();
                 }
             } catch {}
         }
 
-        // ===== Resource Alert History (v0.6) =====
+        // ===== Alert History =====
         function renderAlertHistory(alerts, showAll) {
             const el = document.getElementById('alert-history-list');
             const badge = document.getElementById('alert-history-count');
             const btn = document.getElementById('alert-history-expand');
             if (!alerts || alerts.length === 0) {
                 el.innerHTML = '<span class="text-slate-300">暂无告警</span>';
-                badge.classList.add('hidden');
-                btn.classList.add('hidden');
-                return;
+                badge.classList.add('hidden'); btn.classList.add('hidden'); return;
             }
-            badge.textContent = alerts.length;
-            badge.classList.remove('hidden');
+            badge.textContent = alerts.length; badge.classList.remove('hidden');
             const display = showAll ? alerts : alerts.slice(0, 3);
-            if (alerts.length > 3) {
-                btn.classList.remove('hidden');
-                btn.textContent = showAll ? '收起' : `展开全部 (${alerts.length})`;
-            } else {
-                btn.classList.add('hidden');
-            }
+            if (alerts.length > 3) { btn.classList.remove('hidden'); btn.textContent = showAll ? '收起' : `展开全部 (${alerts.length})`; }
+            else btn.classList.add('hidden');
             el.innerHTML = display.map(a => {
-                const metricIcon = { cpu: 'cpu', memory: 'memory-stick', disk: 'hard-drive', gpu: 'gpu' }[a.metric] || 'alert-triangle';
                 const ts = new Date(a.timestamp).toLocaleString('zh-CN', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
-                // Top processes
                 let procsHtml = '';
                 if (a.top_processes && a.top_processes.length > 0) {
                     procsHtml = a.top_processes.slice(0, 5).map(p =>
-                        `<span class="inline-block bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded mr-1 mb-0.5 text-[10px]">${p.name} <span class="text-red-400">${p.cpu}%</span></span>`
+                        `<span class="inline-block bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-md mr-1 mb-0.5 text-[10px] font-medium">${p.name} <span class="text-red-400 font-bold">${p.cpu}%</span></span>`
                     ).join('');
                 }
-                return `<div class="py-1.5">
+                return `<div class="alert-row">
                     <div class="flex items-center gap-2">
-                        <span class="text-red-400">⚠</span>
-                        <span class="font-medium text-slate-600">${a.metric.toUpperCase()}</span>
-                        <span class="text-red-500 font-semibold">${a.value}%</span>
-                        <span class="text-slate-300">阈值 ${a.threshold}%</span>
-                        <span class="text-slate-300 ml-auto">${ts}</span>
+                        <span class="font-semibold text-slate-600">${a.metric.toUpperCase()}</span>
+                        <span class="text-red-500 font-bold">${a.value}%</span>
+                        <span class="text-slate-300 text-[10px]">阈值 ${a.threshold}%</span>
+                        <span class="text-slate-300 ml-auto text-[10px]">${ts}</span>
                     </div>
-                    ${procsHtml ? '<div class="ml-5 mt-0.5">' + procsHtml + '</div>' : ''}
+                    ${procsHtml ? '<div class="mt-1.5">' + procsHtml + '</div>' : ''}
                 </div>`;
             }).join('');
             lucide.createIcons();
@@ -523,21 +787,22 @@
             const empty = document.getElementById('empty-state');
             if (systems.length === 0) { grid.innerHTML = ''; empty.classList.remove('hidden'); lucide.createIcons(); return; }
             empty.classList.add('hidden');
-            grid.innerHTML = systems.map(s => `
-                <div class="card bg-white rounded-xl border border-slate-200/80 p-5 fade-in"
+            grid.innerHTML = systems.map((s, i) => `
+                <div class="card p-5 fade-in"
                      draggable="true" data-id="${s.id}"
                      ondragstart="handleDragStart(event)" ondragend="handleDragEnd(event)"
                      ondragover="handleDragOver(event)" ondrop="handleDrop(event)"
-                     onmousedown="onCardMouseDown(event, ${s.id})">
-                    <div class="flex items-start justify-between mb-3">
-                        <div class="w-10 h-10 rounded-lg flex items-center justify-center text-white" style="background: ${s.color}">
+                     onmousedown="onCardMouseDown(event, ${s.id})"
+                     style="animation-delay: ${i * 0.05}s">
+                    <div class="flex items-start justify-between mb-3.5">
+                        <div class="card-icon-wrap" style="background: linear-gradient(135deg, ${s.color}, ${s.color}cc)">
                             <i data-lucide="${s.icon}" class="w-5 h-5"></i>
                         </div>
                         <span class="status-dot ${s.online ? 'status-online' : 'status-offline'}"
                               id="status-${s.id}" title="${s.online ? '在线' : '离线'}"></span>
                     </div>
                     <div>
-                        <h3 class="font-semibold text-slate-800 text-[15px] leading-tight">${s.name}</h3>
+                        <h3 class="font-bold text-slate-800 text-[15px] leading-tight">${s.name}</h3>
                         <p class="text-sm text-slate-400 mt-1 leading-snug">${s.description || '暂无描述'}</p>
                     </div>
                     <div class="drag-handle" title="拖拽排序"><i data-lucide="grip-vertical" class="w-4 h-4"></i></div>
@@ -562,11 +827,22 @@
         });
 
         function updateCounts() {
-            document.getElementById('online-count').textContent = systems.filter(s => s.online).length;
+            const online = systems.filter(s => s.online).length;
+            document.getElementById('online-count').textContent = online;
             document.getElementById('total-count').textContent = systems.length;
         }
 
         // ===== Metrics =====
+        // Animate number change
+        function animateValue(el, newText) {
+            el.style.opacity = '0.4'; el.style.transform = 'translateY(-4px)';
+            setTimeout(() => {
+                el.textContent = newText;
+                el.style.opacity = '1'; el.style.transform = 'translateY(0)';
+                el.style.transition = 'opacity 0.3s, transform 0.3s';
+            }, 100);
+        }
+
         async function loadMetrics() {
             try {
                 const res = await fetch('/api/wsl/metrics');
@@ -574,28 +850,31 @@
                 lastMetrics = d;
 
                 // CPU
-                document.getElementById('cpu-val').textContent = d.cpu_percent + '%';
+                animateValue(document.getElementById('cpu-val'), d.cpu_percent + '%');
                 document.getElementById('cpu-bar').style.width = d.cpu_percent + '%';
-                document.getElementById('cpu-bar').className = `h-full rounded-full transition-all duration-500 ${d.cpu_percent > 80 ? 'bg-red-400' : 'bg-blue-400'}`;
+                const cpuHigh = d.cpu_percent > 80;
+                document.getElementById('cpu-bar').className = `prog-bar-fill ${cpuHigh ? 'bg-gradient-to-r from-red-400 to-rose-500' : 'bg-gradient-to-r from-blue-400 to-blue-500'}`;
 
                 // Memory
-                document.getElementById('mem-val').textContent = d.memory.percent + '%';
+                animateValue(document.getElementById('mem-val'), d.memory.percent + '%');
                 const memCached = d.memory.cached ? ` · ${d.memory.cached}MB cached` : '';
                 const memAvail = d.memory.available ? `(${d.memory.available}MB avail)` : '';
                 document.getElementById('mem-detail').textContent = `${d.memory.used} / ${d.memory.total} GB${memCached}${memAvail}`;
                 document.getElementById('mem-bar').style.width = d.memory.percent + '%';
-                document.getElementById('mem-bar').className = `h-full rounded-full transition-all duration-500 ${d.memory.percent > 80 ? 'bg-red-400' : 'bg-emerald-400'}`;
+                const memHigh = d.memory.percent > 80;
+                document.getElementById('mem-bar').className = `prog-bar-fill ${memHigh ? 'bg-gradient-to-r from-red-400 to-rose-500' : 'bg-gradient-to-r from-emerald-400 to-emerald-500'}`;
 
                 // GPU
                 if (d.gpu) {
                     document.getElementById('gpu-body').classList.remove('hidden');
                     document.getElementById('gpu-unavailable').classList.add('hidden');
                     document.getElementById('gpu-name').textContent = d.gpu.name.replace('NVIDIA ', '');
-                    document.getElementById('gpu-util-val').textContent = d.gpu.utilization + '%';
+                    animateValue(document.getElementById('gpu-util-val'), d.gpu.utilization + '%');
                     const gpuMemPct = Math.round(d.gpu.memory_used / d.gpu.memory_total * 100);
                     document.getElementById('gpu-mem-detail').textContent = `${Math.round(d.gpu.memory_used)} / ${Math.round(d.gpu.memory_total)} MiB · ${d.gpu.temperature}°C`;
                     document.getElementById('gpu-mem-bar').style.width = gpuMemPct + '%';
-                    document.getElementById('gpu-mem-bar').className = `h-full rounded-full transition-all duration-500 ${gpuMemPct > 80 ? 'bg-red-400' : 'bg-purple-400'}`;
+                    const gpuHigh = gpuMemPct > 80;
+                    document.getElementById('gpu-mem-bar').className = `prog-bar-fill ${gpuHigh ? 'bg-gradient-to-r from-red-400 to-rose-500' : 'bg-gradient-to-r from-violet-400 to-purple-500'}`;
                 } else {
                     document.getElementById('gpu-body').classList.add('hidden');
                     document.getElementById('gpu-unavailable').classList.remove('hidden');
@@ -614,12 +893,13 @@
                 document.getElementById('load-5').textContent = d.load_avg[1];
                 document.getElementById('load-15').textContent = d.load_avg[2];
 
-                // Top processes — list style
-                if (d.top_processes && d.top_processes.length > 0) {
-                    renderProcesses(d.top_processes);
-                }
+                // Processes
+                if (d.top_processes && d.top_processes.length > 0) renderProcesses(d.top_processes);
 
-                document.getElementById('uptime').textContent = 'up ' + d.uptime;
+                // Uptime
+                const uptimeEl = document.getElementById('uptime');
+                uptimeEl.textContent = 'up ' + d.uptime;
+                uptimeEl.classList.remove('hidden');
                 loadGpuLock();
             } catch {}
         }
@@ -632,24 +912,18 @@
                 const bar = document.getElementById('gpu-lock-bar');
                 const card = document.getElementById('gpu-card');
                 if (!d || d.note) { bar.classList.add('hidden'); card.classList.remove('gpu-locked', 'pulse'); return; }
-
                 bar.classList.remove('hidden');
                 const icon = document.getElementById('gpu-lock-icon');
                 const text = document.getElementById('gpu-lock-text');
                 const btn = document.getElementById('gpu-lock-btn');
-
                 if (d.locked) {
                     card.classList.add('gpu-locked', 'pulse');
-                    icon.textContent = '🔒';
-                    text.textContent = `已锁定 · ${d.who || 'unknown'}`;
-                    btn.textContent = '解锁';
-                    btn.className = 'text-[10px] px-2 py-0.5 rounded transition-colors bg-red-50 text-red-500 hover:bg-red-100';
+                    icon.textContent = '🔒'; text.textContent = `已锁定 · ${d.who || 'unknown'}`;
+                    btn.textContent = '解锁'; btn.className = 'text-[10px] px-2.5 py-0.5 rounded-lg transition-all font-medium bg-red-50 text-red-500 hover:bg-red-100 border border-red-100';
                 } else {
                     card.classList.remove('gpu-locked', 'pulse');
-                    icon.textContent = '🔓';
-                    text.textContent = '空闲';
-                    btn.textContent = '锁定';
-                    btn.className = 'text-[10px] px-2 py-0.5 rounded transition-colors bg-emerald-50 text-emerald-500 hover:bg-emerald-100';
+                    icon.textContent = '🔓'; text.textContent = '空闲';
+                    btn.textContent = '锁定'; btn.className = 'text-[10px] px-2.5 py-0.5 rounded-lg transition-all font-medium bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-100';
                 }
             } catch {}
         }
@@ -659,11 +933,8 @@
             try {
                 const res = await fetch('/api/gpu/lock');
                 const d = await res.json();
-                if (d.locked) {
-                    await fetch('/api/gpu/lock', { method: 'DELETE' });
-                } else {
-                    await fetch('/api/gpu/lock', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({who:'dashboard'}) });
-                }
+                if (d.locked) await fetch('/api/gpu/lock', { method: 'DELETE' });
+                else await fetch('/api/gpu/lock', { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({who:'dashboard'}) });
                 loadGpuLock();
             } catch {}
         }
@@ -673,40 +944,31 @@
                 const res = await fetch('/api/gpu/lock/log?limit=10');
                 const logs = await res.json();
                 const el = document.getElementById('detail-gpu-log-rows');
-                if (logs.length === 0) {
-                    el.innerHTML = '<span class="text-slate-300">暂无记录</span>';
-                    return;
-                }
+                if (logs.length === 0) { el.innerHTML = '<span class="text-slate-300">暂无记录</span>'; return; }
                 el.innerHTML = logs.map(l => {
                     const isLock = l.action === 'lock';
                     const icon = isLock ? '🔒' : '🔓';
                     const actionText = isLock ? '加锁' : '解锁';
-                    const sourceText = l.source === 'auto' ? '自动' : '手动';
                     const sourceColor = l.source === 'auto' ? 'text-purple-400' : 'text-slate-400';
                     const ts = new Date(l.timestamp).toLocaleString('zh-CN', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit'});
                     return `<div class="flex items-center gap-2 py-0.5">
                         <span>${icon}</span>
-                        <span class="text-slate-600">${actionText} · ${l.who}</span>
-                        <span class="${sourceColor}">${sourceText}</span>
+                        <span class="text-slate-600 font-medium">${actionText} · ${l.who}</span>
+                        <span class="${sourceColor} text-[10px]">${l.source === 'auto' ? '自动' : '手动'}</span>
                         <span class="text-slate-300 ml-auto">${ts}</span>
                     </div>`;
                 }).join('');
             } catch {}
         }
 
-        // ===== Top Processes: list rendering =====
+        // ===== Process rendering =====
         function renderProcesses(procs) {
             const el = document.getElementById('top-processes');
             const btn = document.getElementById('proc-expand-btn');
-            if (!procs || procs.length === 0) {
-                el.innerHTML = '<span class="text-slate-300">暂无数据</span>';
-                btn.classList.add('hidden');
-                return;
-            }
+            if (!procs || procs.length === 0) { el.innerHTML = '<span class="text-slate-300">暂无数据</span>'; btn.classList.add('hidden'); return; }
             const display = showAllProc ? procs : procs.slice(0, 5);
-            let html = '<div class="space-y-0">';
-            // Header — 7 columns
-            html += `<div class="flex items-center gap-2 pb-1.5 mb-1.5 border-b border-slate-200">
+            let html = '<div>';
+            html += `<div class="flex items-center gap-2 pb-2 mb-1 border-b border-slate-100">
                 <span class="proc-header w-12">PID</span>
                 <span class="proc-header flex-1">进程</span>
                 <span class="proc-header w-10 text-right">CPU%</span>
@@ -716,61 +978,55 @@
                 <span class="proc-header w-12 text-right">运行时长</span>
             </div>`;
             for (const p of display) {
-                const statusColor = p.status === 'running' ? 'text-emerald-500' :
-                                  p.status === 'sleeping' ? 'text-slate-400' : 'text-amber-500';
-                html += `<div class="flex items-center gap-2 py-1 hover:bg-slate-50 rounded text-[12px]">
+                const statusColor = p.status === 'running' ? 'text-emerald-500' : p.status === 'sleeping' ? 'text-slate-400' : 'text-amber-500';
+                const cpuHigh = p.cpu > 5;
+                html += `<div class="proc-row flex items-center gap-2 text-[12px]">
                     <span class="w-12 text-slate-400 font-mono">${p.pid}</span>
-                    <span class="flex-1 truncate text-slate-700">${p.name}</span>
-                    <span class="w-10 text-right ${p.cpu > 5 ? 'text-red-500 font-semibold' : 'text-slate-600'}">${p.cpu}</span>
-                    <span class="w-14 text-right text-slate-500">${p.mem_mb}</span>
-                    <span class="w-10 text-right text-slate-500">${p.mem_pct}</span>
+                    <span class="flex-1 truncate text-slate-700 font-medium">${p.name}</span>
+                    <span class="w-10 text-right ${cpuHigh ? 'text-red-500 font-bold' : 'text-slate-600'}">${p.cpu}</span>
+                    <span class="w-14 text-right text-slate-500 font-mono">${p.mem_mb}</span>
+                    <span class="w-10 text-right text-slate-500 font-mono">${p.mem_pct}</span>
                     <span class="w-10 text-right text-slate-400">${p.threads || '-'}</span>
-                    <span class="w-12 text-right text-slate-400" title="${p.status}"><span class="${statusColor}">●</span> ${p.runtime || '-'}</span>
+                    <span class="w-12 text-right text-slate-400"><span class="${statusColor}">●</span> ${p.runtime || '-'}</span>
                 </div>`;
             }
             html += '</div>';
             el.innerHTML = html;
-
-            // Expand button: toggle 5 / 20
-            if (procs.length > 5) {
-                btn.classList.remove('hidden');
-                btn.textContent = showAllProc ? '收起' : `展开全部 (${procs.length})`;
-            } else {
-                btn.classList.add('hidden');
-            }
+            if (procs.length > 5) { btn.classList.remove('hidden'); btn.textContent = showAllProc ? '收起' : `展开全部 (${procs.length})`; }
+            else btn.classList.add('hidden');
         }
 
         function toggleProcesses() {
             showAllProc = !showAllProc;
-            if (lastMetrics && lastMetrics.top_processes) {
-                renderProcesses(lastMetrics.top_processes);
-            }
+            if (lastMetrics && lastMetrics.top_processes) renderProcesses(lastMetrics.top_processes);
         }
 
-        // ===== History / Sparkline =====
+        // ===== Sparkline =====
         function renderSparkline(svgId, data, events, color, warnColor) {
             const svg = document.getElementById(svgId);
             if (!svg || data.length < 2) { if (svg) svg.innerHTML = ''; return; }
-            const W = 200, H = 28, PAD = 2;
+            const W = 200, H = 30, PAD = 2;
             const vals = data.map(d => d.value);
             const tsList = data.map(d => d.timestamp);
             const maxV = Math.max(...vals, 1);
-            const points = vals.map((v, i) => {
-                const x = PAD + (i / (vals.length - 1)) * (W - 2 * PAD);
-                const y = H - PAD - (v / maxV) * (H - 2 * PAD);
-                return { x, y };
-            });
+            const points = vals.map((v, i) => ({
+                x: PAD + (i / (vals.length - 1)) * (W - 2 * PAD),
+                y: H - PAD - (v / maxV) * (H - 2 * PAD)
+            }));
             const lastVal = vals[vals.length - 1];
             const strokeColor = lastVal > 80 ? warnColor : color;
             const ptsStr = points.map(p => `${p.x},${p.y}`).join(' ');
             const areaPath = `M${ptsStr} L${points[points.length-1].x},${H} L${points[0].x},${H} Z`;
-            let html = `<defs><linearGradient id="grad-${svgId}" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="${strokeColor}" stop-opacity="0.15"/>
-                <stop offset="100%" stop-color="${strokeColor}" stop-opacity="0"/>
-            </linearGradient></defs>
-            <path d="${areaPath}" fill="url(#grad-${svgId})"/>
+            const gradId = `grad-${svgId}-${Date.now()}`;
+            let html = `<defs>
+                <linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="${strokeColor}" stop-opacity="0.25"/>
+                    <stop offset="100%" stop-color="${strokeColor}" stop-opacity="0"/>
+                </linearGradient>
+            </defs>
+            <path d="${areaPath}" fill="url(#${gradId})"/>
             <polyline points="${ptsStr}" fill="none" stroke="${strokeColor}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle cx="${points[points.length-1].x}" cy="${points[points.length-1].y}" r="2" fill="${strokeColor}"/>`;
+            <circle cx="${points[points.length-1].x}" cy="${points[points.length-1].y}" r="2.5" fill="${strokeColor}" stroke="white" stroke-width="1"/>`;
             if (events && events.length > 0) {
                 const firstTs = new Date(tsList[0]).getTime();
                 const lastTs = new Date(tsList[tsList.length - 1]).getTime();
@@ -780,7 +1036,7 @@
                     if (eTs < firstTs || eTs > lastTs) return;
                     const x = PAD + ((eTs - firstTs) / range) * (W - 2 * PAD);
                     const lc = e.event_type === 'boot' ? '#34d399' : '#cbd5e1';
-                    html += `<line x1="${x}" y1="${PAD}" x2="${x}" y2="${H-PAD}" stroke="${lc}" stroke-width="1" stroke-dasharray="2,2" opacity="0.7"/>`;
+                    html += `<line x1="${x}" y1="${PAD}" x2="${x}" y2="${H-PAD}" stroke="${lc}" stroke-width="1.5" stroke-dasharray="2,2" opacity="0.8"/>`;
                 });
             }
             svg.innerHTML = html;
@@ -796,40 +1052,37 @@
             const minV = Math.min(...vals, 0);
             const vRange = maxV - minV || 1;
             const xRange = tsList[tsList.length - 1] - tsList[0] || 1;
-
             const points = vals.map((v, i) => ({
                 x: PAD + ((tsList[i] - tsList[0]) / xRange) * (W - 2 * PAD),
                 y: PAD + (1 - (v - minV) / vRange) * (H - 2 * PAD)
             }));
             const ptsStr = points.map(p => `${p.x},${p.y}`).join(' ');
             const areaPath = `M${ptsStr} L${points[points.length-1].x},${H-PAD} L${points[0].x},${H-PAD} Z`;
-
-            // Y-axis labels
             let labels = '';
             for (let i = 0; i <= 4; i++) {
                 const y = PAD + (i / 4) * (H - 2 * PAD);
                 const v = maxV - (i / 4) * vRange;
-                labels += `<text x="${PAD - 6}" y="${y + 3}" text-anchor="end" font-size="10" fill="#94a3b8">${Math.round(v)}</text>`;
-                labels += `<line x1="${PAD}" y1="${y}" x2="${W - PAD}" y2="${y}" stroke="#f1f5f9" stroke-width="1"/>`;
+                labels += `<text x="${PAD - 8}" y="${y + 4}" text-anchor="end" font-size="10" fill="#94a3b8" font-family="ui-monospace,monospace">${Math.round(v)}</text>`;
+                labels += `<line x1="${PAD}" y1="${y}" x2="${W - PAD}" y2="${y}" stroke="rgba(241,245,249,0.8)" stroke-width="1"/>`;
             }
-            // X-axis time labels
             const timeSteps = 5;
             for (let i = 0; i <= timeSteps; i++) {
                 const ts = tsList[0] + (i / timeSteps) * xRange;
                 const x = PAD + (i / timeSteps) * (W - 2 * PAD);
                 const d = new Date(ts);
                 const label = `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-                labels += `<text x="${x}" y="${H - PAD + 16}" text-anchor="middle" font-size="9" fill="#94a3b8">${label}</text>`;
+                labels += `<text x="${x}" y="${H - PAD + 18}" text-anchor="middle" font-size="9" fill="#94a3b8" font-family="ui-monospace,monospace">${label}</text>`;
             }
-
             svg.innerHTML = `${labels}
-                <defs><linearGradient id="grad-detail" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="${color}" stop-opacity="0.15"/>
-                    <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
-                </linearGradient></defs>
-                <path d="${areaPath}" fill="url(#grad-detail)"/>
+                <defs>
+                    <linearGradient id="grad-detail-big" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="${color}" stop-opacity="0.2"/>
+                        <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+                    </linearGradient>
+                </defs>
+                <path d="${areaPath}" fill="url(#grad-detail-big)"/>
                 <polyline points="${ptsStr}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <circle cx="${points[points.length-1].x}" cy="${points[points.length-1].y}" r="4" fill="${color}"/>`;
+                <circle cx="${points[points.length-1].x}" cy="${points[points.length-1].y}" r="5" fill="${color}" stroke="white" stroke-width="2"/>`;
         }
 
         function switchRange(hours) {
@@ -845,25 +1098,16 @@
                 const data = resp.data || [];
                 currentEvents = resp.events || [];
                 if (data.length === 0) return;
-                // CPU
-                if (resp.metric === 'cpu_percent' || !resp.metric) {
-                    const cpuRes = await fetch(`/api/wsl/metrics/history?hours=${currentRange}&metric=cpu_percent`);
-                    const cpuResp = await cpuRes.json();
-                    renderSparkline('cpu-spark', cpuResp.data || [], currentEvents, '#60a5fa', '#f87171');
-                }
-                // Memory
+                const cpuRes = await fetch(`/api/wsl/metrics/history?hours=${currentRange}&metric=cpu_percent`);
+                const cpuResp = await cpuRes.json();
+                renderSparkline('cpu-spark', cpuResp.data || [], currentEvents, '#60a5fa', '#f87171');
                 const memRes = await fetch(`/api/wsl/metrics/history?hours=${currentRange}&metric=mem_percent`);
                 const memResp = await memRes.json();
                 renderSparkline('mem-spark', memResp.data || [], currentEvents, '#34d399', '#f87171');
-                // GPU util
                 const gpuRes = await fetch(`/api/wsl/metrics/history?hours=${currentRange}&metric=gpu_util`);
                 const gpuResp = await gpuRes.json();
                 if (gpuResp.data && gpuResp.data.length > 0) renderSparkline('gpu-spark', gpuResp.data, currentEvents, '#a78bfa', '#f87171');
                 else { const svg = document.getElementById('gpu-spark'); if (svg) svg.innerHTML = ''; }
-                // Load
-                const loadRes = await fetch(`/api/wsl/metrics/history?hours=${currentRange}&metric=load1`);
-                const loadResp = await loadRes.json();
-                renderSparkline('load-spark', loadResp.data || [], currentEvents, '#fb7185', '#f87171');
             } catch {}
         }
 
@@ -878,20 +1122,18 @@
                         { key:'gpu_temp',      label:'温度',   unit:'°C' },
                         { key:'gpu_power',     label:'功耗',   unit:'W' }
                     ]},
-            disk_io: { title: 'Disk IO 读取', icon: 'hard-drive',  field: 'disk_read_rate', color: '#fbbf24', unit: ' MB/s' },
-            net_io:  { title: 'Network 下载', icon: 'wifi',         field: 'net_recv_rate', color: '#38bdf8', unit: ' MB/s' },
-            load: { title: 'Load Average',   icon: 'gauge',        field: 'load1',        color: '#fb7185', unit: '' }
+            disk_io: { title: 'Disk IO 读取', icon: 'hard-drive', field: 'disk_read_rate', color: '#fbbf24', unit: ' MB/s' },
+            net_io:  { title: 'Network 下载', icon: 'wifi',        field: 'net_recv_rate', color: '#38bdf8', unit: ' MB/s' },
+            load: { title: 'Load Average',   icon: 'gauge',       field: 'load1',        color: '#fb7185', unit: '' }
         };
-        let gpuSubKey = 'gpu_util';  // active GPU sub-metric
+        let gpuSubKey = 'gpu_util';
 
         async function showDetail(type) {
-            detailType = type;
-            detailHours = 24;
+            detailType = type; detailHours = 24;
             const cfg = METRIC_CONFIG[type];
             const modal = document.getElementById('detail-modal');
             document.getElementById('detail-title').textContent = cfg.title;
             document.getElementById('detail-icon').setAttribute('data-lucide', cfg.icon);
-            // Render sub-metric tabs for GPU
             const subArea = document.getElementById('detail-sub');
             if (cfg.subMetrics) {
                 gpuSubKey = cfg.subMetrics[0].key;
@@ -899,18 +1141,11 @@
                     `<button onclick="switchGpuSub('${s.key}')" class="gpu-sub-btn ${s.key === gpuSubKey ? 'active' : ''}" data-key="${s.key}">${s.label}</button>`
                 ).join('');
                 subArea.classList.remove('hidden');
-            } else {
-                subArea.classList.add('hidden');
-            }
+            } else { subArea.classList.add('hidden'); }
             lucide.createIcons();
             modal.classList.remove('hidden');
-            // Load GPU lock history
-            if (type === 'gpu') {
-                loadGpuLockLog();
-                document.getElementById('detail-gpu-log').classList.remove('hidden');
-            } else {
-                document.getElementById('detail-gpu-log').classList.add('hidden');
-            }
+            if (type === 'gpu') { loadGpuLockLog(); document.getElementById('detail-gpu-log').classList.remove('hidden'); }
+            else document.getElementById('detail-gpu-log').classList.add('hidden');
             updateDetailRangeLabel();
             await updateDetailChart();
             startDetailRefresh();
@@ -925,33 +1160,26 @@
         async function updateDetailChart() {
             if (!detailType) return;
             const cfg = METRIC_CONFIG[detailType];
-            // Determine the actual metric field
-            let field = cfg.field;
-            let unit = cfg.unit;
+            let field = cfg.field, unit = cfg.unit;
             if (cfg.subMetrics) {
                 const sub = cfg.subMetrics.find(s => s.key === gpuSubKey);
-                field = sub ? sub.key : cfg.field;
-                unit = sub ? sub.unit : cfg.unit;
+                field = sub ? sub.key : cfg.field; unit = sub ? sub.unit : cfg.unit;
             }
             try {
                 const res = await fetch(`/api/wsl/metrics/history?hours=${detailHours}&metric=${field}`);
                 const resp = await res.json();
                 const data = resp.data || [];
                 renderBigChart('detail-spark', data, cfg.color);
-                // Stats
                 if (data.length > 0) {
                     const vals = data.map(d => d.value);
                     const cur = vals[vals.length - 1];
                     document.getElementById('detail-current').textContent = cur + unit;
                     document.getElementById('detail-stat').textContent =
-                        `avg ${Math.round(vals.reduce((a,b) => a+b, 0) / vals.length)} · min ${Math.min(...vals)} · max ${Math.max(...vals)}`;
+                        `avg ${Math.round(vals.reduce((a,b)=>a+b,0)/vals.length)} · min ${Math.min(...vals)} · max ${Math.max(...vals)}`;
                 }
-                // Update current value from live data
                 if (lastMetrics) {
                     const liveVal = getLiveValue(detailType, field);
-                    if (liveVal !== null) {
-                        document.getElementById('detail-current').textContent = liveVal + unit;
-                    }
+                    if (liveVal !== null) document.getElementById('detail-current').textContent = liveVal + unit;
                 }
             } catch {}
         }
@@ -975,14 +1203,11 @@
             }
         }
 
-        async function detailTick() {
-            await loadMetrics();
-            await updateDetailChart();
-        }
+        async function detailTick() { await loadMetrics(); await updateDetailChart(); }
 
         function startDetailRefresh() {
             if (detailInterval) clearInterval(detailInterval);
-            detailInterval = setInterval(detailTick, 30000); // 30s refresh for live value
+            detailInterval = setInterval(detailTick, 30000);
         }
 
         function updateDetailRangeLabel() {
@@ -991,33 +1216,26 @@
         }
 
         function closeDetail(e) {
-            if (e && e.target !== document.getElementById('detail-modal')) return;
-            if (!e) { /* called directly */ }
+            // e 为 undefined：来自 × 按钮直接调用，直接关闭
+            // e 存在：来自遮罩 onclick，此时内容区已 stopPropagation，target 就是遮罩本身
             document.getElementById('detail-modal').classList.add('hidden');
             if (detailInterval) { clearInterval(detailInterval); detailInterval = null; }
             detailType = '';
         }
 
-        // Scroll wheel to zoom time axis
         document.getElementById('detail-modal').addEventListener('wheel', (e) => {
             e.preventDefault();
             const idx = DETAIL_HOURS.indexOf(detailHours);
-            if (e.deltaY < 0 && idx > 0) {
-                // Scroll up → zoom in (shorter time)
-                detailHours = DETAIL_HOURS[idx - 1];
-            } else if (e.deltaY > 0 && idx < DETAIL_HOURS.length - 1) {
-                // Scroll down → zoom out (longer time)
-                detailHours = DETAIL_HOURS[idx + 1];
-            } else return;
-            updateDetailRangeLabel();
-            updateDetailChart();
+            if (e.deltaY < 0 && idx > 0) detailHours = DETAIL_HOURS[idx - 1];
+            else if (e.deltaY > 0 && idx < DETAIL_HOURS.length - 1) detailHours = DETAIL_HOURS[idx + 1];
+            else return;
+            updateDetailRangeLabel(); updateDetailChart();
         });
 
         // ===== Network Monitor =====
         function formatBytes(bytes) {
             if (bytes === 0) return '0 B';
-            const k = 1024;
-            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const k = 1024, sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             const v = bytes / Math.pow(k, i);
             return (i === 0 ? v : v.toFixed(1)) + ' ' + sizes[i];
@@ -1031,7 +1249,6 @@
                 ]);
                 const summary = await summaryRes.json();
                 const alertData = await alertRes.json();
-
                 renderNetTraffic(summary.traffic || []);
                 renderNetProcesses(summary.top_processes || []);
                 renderNetAlerts(alertData.alerts || []);
@@ -1040,23 +1257,21 @@
 
         function renderNetTraffic(traffic) {
             const el = document.getElementById('net-traffic-content');
-            if (!traffic || traffic.length === 0) {
-                el.innerHTML = '<span class="text-xs text-slate-300">暂无数据</span>';
-                return;
-            }
+            if (!traffic || traffic.length === 0) { el.innerHTML = '<span class="text-xs text-slate-300">暂无数据</span>'; return; }
             let html = '';
             for (const iface of traffic) {
                 if (iface.rx === 0 && iface.tx === 0) continue;
                 const total = (iface.rx || 0) + (iface.tx || 0);
-                const name = iface.interface === 'eth1' ? 'WSL 主网卡' :
-                           iface.interface === 'tailscale0' ? 'Tailscale' : iface.interface;
-                html += `<div class="flex items-center justify-between py-1">
-                    <span class="text-slate-600">${name}</span>
-                    <span class="text-slate-400">${formatBytes(total)}</span>
-                </div>
-                <div class="flex items-center gap-3 mb-2">
-                    <span class="text-[10px] text-sky-400">↓ ${formatBytes(iface.rx || 0)}</span>
-                    <span class="text-[10px] text-emerald-400">↑ ${formatBytes(iface.tx || 0)}</span>
+                const name = iface.interface === 'eth1' ? 'WSL 主网卡' : iface.interface === 'tailscale0' ? 'Tailscale' : iface.interface;
+                html += `<div class="net-iface-row">
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-700 font-medium text-sm">${name}</span>
+                        <span class="text-slate-500 font-mono text-sm">${formatBytes(total)}</span>
+                    </div>
+                    <div class="flex items-center gap-3 mt-1">
+                        <span class="text-[11px] text-sky-500 font-medium">↓ ${formatBytes(iface.rx || 0)}</span>
+                        <span class="text-[11px] text-emerald-500 font-medium">↑ ${formatBytes(iface.tx || 0)}</span>
+                    </div>
                 </div>`;
             }
             el.innerHTML = html || '<span class="text-xs text-slate-300">暂无流量数据</span>';
@@ -1064,23 +1279,20 @@
 
         function renderNetProcesses(procs) {
             const el = document.getElementById('net-processes');
-            if (!procs || procs.length === 0) {
-                el.innerHTML = '<span class="text-xs text-slate-300">暂无数据</span>';
-                return;
-            }
+            if (!procs || procs.length === 0) { el.innerHTML = '<span class="text-xs text-slate-300">暂无数据</span>'; return; }
             const display = procs.slice(0, 5);
-            let html = '<div class="space-y-0">';
-            html += `<div class="flex items-center gap-2 pb-1.5 mb-1 border-b border-slate-200 proc-header">
+            let html = '<div>';
+            html += `<div class="flex items-center gap-2 pb-1.5 mb-1 border-b border-slate-100 proc-header">
                 <span class="flex-1">进程</span>
-                <span class="w-14 text-right">上传</span>
-                <span class="w-14 text-right">下载</span>
+                <span class="w-16 text-right">上传</span>
+                <span class="w-16 text-right">下载</span>
             </div>`;
             for (const p of display) {
                 const name = p.process_name.split('/').pop() || p.process_name;
-                html += `<div class="flex items-center gap-2 py-0.5 text-[11px]">
-                    <span class="flex-1 truncate text-slate-700">${name}</span>
-                    <span class="w-14 text-right text-sky-500">${formatBytes(p.sent || 0)}</span>
-                    <span class="w-14 text-right text-emerald-500">${formatBytes(p.recv || 0)}</span>
+                html += `<div class="flex items-center gap-2 py-1 text-[11px] hover:bg-slate-50 rounded-md px-1 -mx-1 transition-colors">
+                    <span class="flex-1 truncate text-slate-700 font-medium">${name}</span>
+                    <span class="w-16 text-right text-sky-500 font-mono font-medium">${formatBytes(p.sent || 0)}</span>
+                    <span class="w-16 text-right text-emerald-500 font-mono font-medium">${formatBytes(p.recv || 0)}</span>
                 </div>`;
             }
             html += '</div>';
@@ -1091,50 +1303,31 @@
             const area = document.getElementById('net-alerts-area');
             const el = document.getElementById('net-alerts');
             const badge = document.getElementById('net-alert-count');
-
-            if (!alerts || alerts.length === 0) {
-                area.classList.add('hidden');
-                return;
-            }
-
+            if (!alerts || alerts.length === 0) { area.classList.add('hidden'); return; }
             area.classList.remove('hidden');
-            badge.textContent = alerts.length;
-            badge.classList.remove('hidden');
-
+            badge.textContent = alerts.length; badge.classList.remove('hidden');
             const btn = document.getElementById('alert-expand-btn');
-            if (alerts.length > 3) {
-                btn.classList.remove('hidden');
-                btn.textContent = showAllAlerts ? '收起' : `展开全部 (${alerts.length})`;
-            } else {
-                btn.classList.add('hidden');
-            }
-
+            if (alerts.length > 3) { btn.classList.remove('hidden'); btn.textContent = showAllAlerts ? '收起' : `展开全部 (${alerts.length})`; }
+            else btn.classList.add('hidden');
             const display = showAllAlerts ? alerts : alerts.slice(0, 3);
             el.innerHTML = display.map(a => {
-                const icon = a.severity === 'warning' ? '<span class="text-amber-500">⚠</span>' :
-                           a.severity === 'danger' ? '<span class="text-red-500">🔴</span>' :
-                           '<span class="text-blue-400">ℹ</span>';
-                return `<div class="flex items-center gap-2 py-0.5">
+                const icon = a.severity === 'warning' ? '<span class="text-amber-500 text-base">⚠</span>' :
+                           a.severity === 'danger' ? '<span class="text-red-500 text-base">🔴</span>' : '<span class="text-blue-400 text-base">ℹ</span>';
+                return `<div class="flex items-center gap-2 py-1.5 px-3 rounded-xl hover:bg-amber-50/50 transition-colors">
                     ${icon}
-                    <span class="text-slate-600 truncate">${a.detail || a.alert_type}
-                        <span class="text-slate-300 ml-1">${new Date(a.timestamp).toLocaleString('zh-CN', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}</span>
+                    <span class="text-slate-600 truncate flex-1">${a.detail || a.alert_type}
+                        <span class="text-slate-300 ml-1.5 text-[10px]">${new Date(a.timestamp).toLocaleString('zh-CN', {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}</span>
                     </span>
-                    <button onclick="ackAlert(${a.id})" class="ml-auto text-[10px] text-slate-300 hover:text-slate-500">忽略</button>
+                    <button onclick="ackAlert(${a.id})" class="text-[10px] text-slate-300 hover:text-slate-500 transition-colors ml-auto font-medium">忽略</button>
                 </div>`;
             }).join('');
         }
 
         async function ackAlert(id) {
-            try {
-                await fetch(`/api/net/alerts/${id}/ack`, { method: 'POST' });
-                loadNetData();
-            } catch {}
+            try { await fetch(`/api/net/alerts/${id}/ack`, { method: 'POST' }); loadNetData(); } catch {}
         }
 
-        function toggleAlerts() {
-            showAllAlerts = !showAllAlerts;
-            loadNetData();
-        }
+        function toggleAlerts() { showAllAlerts = !showAllAlerts; loadNetData(); }
 
         // ===== Events =====
         async function loadEvents() {
@@ -1145,10 +1338,12 @@
                 if (events.length === 0) { el.innerHTML = '<span class="text-slate-300">暂无记录</span>'; return; }
                 el.innerHTML = events.map(e => {
                     const isBoot = e.event_type === 'boot';
-                    return `<div class="flex items-center gap-2">
-                        <span class="${isBoot ? 'text-emerald-400' : 'text-slate-400'}">${isBoot ? '▲' : '▼'}</span>
-                        <span class="text-slate-500">${isBoot ? '开机' : '关机'}</span>
-                        <span class="text-slate-300 ml-auto">${new Date(e.timestamp).toLocaleString('zh-CN', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' })}</span>
+                    return `<div class="event-item">
+                        <div class="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0 ${isBoot ? 'bg-emerald-50' : 'bg-slate-50'}">
+                            <span class="text-[11px] ${isBoot ? 'text-emerald-500' : 'text-slate-400'}">${isBoot ? '▲' : '▼'}</span>
+                        </div>
+                        <span class="text-slate-600 font-medium">${isBoot ? '开机' : '关机'}</span>
+                        <span class="text-slate-300 ml-auto text-[11px]">${new Date(e.timestamp).toLocaleString('zh-CN', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' })}</span>
                     </div>`;
                 }).join('');
             } catch {}
